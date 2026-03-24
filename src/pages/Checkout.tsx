@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Card, CardContent } from '@/components/ui/card';
-import { CreditCard, Smartphone, Banknote, Clock, Loader2 } from 'lucide-react';
+import { CreditCard, Smartphone, Clock, Loader2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 
@@ -23,9 +23,8 @@ const Checkout = () => {
   const [orderId, setOrderId] = useState('');
 
   const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-  const tax = subtotal * 0.18;
   const shipping = 100;
-  const total = subtotal + tax + shipping;
+  const total = subtotal + shipping; // GST removed
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -241,8 +240,7 @@ const Checkout = () => {
                   ))}
                 </div>
                 <div className="space-y-2 text-sm border-t border-gray-100 pt-4">
-                  <div className="flex justify-between text-gray-600"><span>Subtotal:</span> <span>₹{subtotal}</span></div>
-                  <div className="flex justify-between text-gray-600"><span>GST (18%):</span> <span>₹{tax.toFixed(2)}</span></div>
+                  <div className="flex justify-between text-gray-600"><span>Subtotal (Incl. taxes):</span> <span>₹{subtotal}</span></div>
                   <div className="flex justify-between text-gray-600"><span>Shipping:</span> <span>₹{shipping}</span></div>
                   <div className="flex justify-between font-bold text-lg pt-2 text-gray-900">
                     <span>Total:</span> <span>₹{total.toFixed(2)}</span>

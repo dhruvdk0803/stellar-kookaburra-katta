@@ -3,7 +3,6 @@ import { useCart } from '@/contexts/CartContext';
 import Navigation from '@/components/Navigation';
 import Footer from '@/components/Footer';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Trash2, ArrowRight, ShoppingCart } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
@@ -11,8 +10,7 @@ const Cart = () => {
   const { cart, updateQuantity, removeFromCart, clearCart } = useCart();
 
   const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-  const tax = subtotal * 0.18; // Mock 18% GST
-  const total = subtotal + tax;
+  const total = subtotal; // GST removed as prices are inclusive
 
   if (cart.length === 0) {
     return (
@@ -99,12 +97,8 @@ const Cart = () => {
                 <h2 className="text-xl font-semibold text-gray-900 mb-6">Order Summary</h2>
                 <div className="space-y-4 text-sm text-gray-600">
                   <div className="flex justify-between">
-                    <span>Subtotal</span>
+                    <span>Subtotal (Incl. taxes)</span>
                     <span className="font-medium text-gray-900">₹{subtotal.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>GST (18%)</span>
-                    <span className="font-medium text-gray-900">₹{tax.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between border-t border-gray-100 pt-4 mt-4">
                     <span className="text-base font-bold text-gray-900">Total</span>

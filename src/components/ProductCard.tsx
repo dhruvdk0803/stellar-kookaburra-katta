@@ -11,7 +11,7 @@ interface ProductCardProps {
 }
 
 const ProductCard = ({ product, isInWishlist, onWishlistToggle }: ProductCardProps) => {
-  const { addToCart } = useCart();
+  const { cart, addToCart, updateQuantity, removeFromCart } = useCart();
 
   // Use the first image from the array, fallback to legacy image_url, then placeholder
   const imageUrl = (product.images && product.images.length > 0) 
@@ -19,6 +19,9 @@ const ProductCard = ({ product, isInWishlist, onWishlistToggle }: ProductCardPro
     : (product.image_url || product.image || 'https://via.placeholder.com/400x400.png?text=No+Image');
     
   const categoryName = product.categories?.name || product.subcategory || 'Uncategorized';
+
+  // Check if product is already in cart
+  const cartItem = cart.find(item => item.id === product.id);
 
   const handleAddToCart = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -29,6 +32,16 @@ const ProductCard = ({ product, isInWishlist, onWishlistToggle }: ProductCardPro
       price: product.price, 
       image: imageUrl 
     });
+  };
+
+  const handleUpdateQuantity = (e: React.MouseEvent, newQuantity: number) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (newQuantity === 0) {
+      removeFromCart(product.id);
+    } else {
+      updateQuantity(product.id, newQuantity);
+    }
   };
 
   const handleWishlistClick = (e: React.MouseEvent) => {
@@ -58,10 +71,33 @@ const ProductCard = ({ product, isInWishlist, onWishlistToggle }: ProductCardPro
         </div>
         <div className="mt-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0 pt-3 border-t border-gray-50">
           <span className="text-xl font-bold text-primary">₹{product.price}</span>
-          <Button onClick={handleAddToCart} size="sm" className="rounded-full w-full sm:w-auto bg-primary/10 text-primary hover:bg-primary hover:text-white transition-colors">
-            <ShoppingCart className="h-4 w-4 mr-2" />
-            Add
-          </Button>
+          
+          {cartItem ? (
+            <div className="flex items-center space-x-1 bg-gray-100 rounded-full p-1 w-full sm:w-auto justify-between sm:justify-start">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 rounded-full bg-white shadow-sm hover:bg-gray-50 text-gray-700"
+                onClick={(e) => handleUpdateQuantity(e, cartItem.quantity - 1)}
+              >
+                -
+              </Button>
+              <span className="w-8 text-center font-semibold text-sm">{cartItem.quantity}</span>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 rounded-full bg-white shadow-sm hover:bg-gray-50 text-gray-700"
+                onClick={(e) => handleUpdateQuantity(e, cartItem.quantity + 1)}
+              >
+                +
+              </Button>
+            </div>
+          ) : (
+            <Button onClick={handleAddToCart} size="sm" className="rounded-full w-full sm:w-auto bg-primary/10 text-primary hover:bg-primary hover:text-white transition-colors">
+              <ShoppingCart className="h-4 w-4 mr-2" />
+              Add
+            </Button>
+          )}
         </div>
       </div>
     </div>

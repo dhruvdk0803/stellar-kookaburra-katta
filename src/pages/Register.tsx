@@ -34,7 +34,7 @@ const Register = () => {
                 supabaseClient={supabase}
                 appearance={{ theme: ThemeSupa }}
                 theme="light"
-                providers={[]}
+                providers={['google']}
                 view="sign_up"
                 redirectTo={window.location.origin + '/account'}
               />

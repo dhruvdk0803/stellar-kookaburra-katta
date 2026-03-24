@@ -1,5 +1,5 @@
 import React from 'react';
-import { Facebook, Twitter, Instagram, Linkedin, MapPin, Phone, Mail } from 'lucide-react';
+import { MapPin, Phone, Mail } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Link } from 'react-router-dom';
@@ -25,20 +25,6 @@ const Footer = () => {
               <Mail className="h-4 w-4 mr-2 flex-shrink-0" />
               <a href="mailto:mr.kattas1@gmail.com" className="hover:text-primary transition-colors">mr.kattas1@gmail.com</a>
             </div>
-          </div>
-          <div className="flex space-x-4">
-            <Button variant="ghost" size="icon" className="hover:bg-primary/20 rounded-full">
-              <Facebook className="h-5 w-5" />
-            </Button>
-            <Button variant="ghost" size="icon" className="hover:bg-primary/20 rounded-full">
-              <Twitter className="h-5 w-5" />
-            </Button>
-            <Button variant="ghost" size="icon" className="hover:bg-primary/20 rounded-full">
-              <Instagram className="h-5 w-5" />
-            </Button>
-            <Button variant="ghost" size="icon" className="hover:bg-primary/20 rounded-full">
-              <Linkedin className="h-5 w-5" />
-            </Button>
           </div>
         </div>
 
