@@ -12,7 +12,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Auth } from '@supabase/auth-ui-react';
 import { ThemeSupa } from '@supabase/auth-ui-shared';
-import { Loader2, LogOut, Package, Tags, ShoppingBag, Edit2, X, DollarSign, Activity, LayoutDashboard, ChevronDown, ChevronUp, Upload, Image as ImageIcon, FileSpreadsheet } from 'lucide-react';
+import { Loader2, LogOut, Package, Tags, ShoppingBag, Edit2, X, DollarSign, Activity, LayoutDashboard, ChevronDown, ChevronUp, Upload, Image as ImageIcon, FileSpreadsheet, Wrench } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
 
 const Admin = () => {
@@ -39,6 +39,7 @@ const Admin = () => {
   const [prodImages, setProdImages] = useState<string[]>([]);
   const [isUploadingImages, setIsUploadingImages] = useState(false);
   const [isUploadingBulk, setIsUploadingBulk] = useState(false);
+  const [isFixingDescriptions, setIsFixingDescriptions] = useState(false);
 
   useEffect(() => {
     if (profile?.role === 'admin') {
@@ -231,6 +232,43 @@ const Admin = () => {
     } finally {
       setIsUploadingBulk(false);
       e.target.value = '';
+    }
+  };
+
+  // --- Quick Fixes ---
+  const handleFixDescriptions = async () => {
+    setIsFixingDescriptions(true);
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .select('id, description')
+        .ilike('description', '%Acrylic sheets are positioned%');
+        
+      if (error) throw error;
+      
+      if (data && data.length > 0) {
+        let count = 0;
+        for (const product of data) {
+          if (product.description) {
+            // Remove the specific line and any extra whitespace
+            const newDesc = product.description
+              .replace('👉 Acrylic sheets are positioned as more premium than Sunmica — highlight this clearly.', '')
+              .replace('👉 Acrylic sheets are positioned as more premium than Sunmica - highlight this clearly.', '')
+              .trim();
+              
+            await supabase.from('products').update({ description: newDesc }).eq('id', product.id);
+            count++;
+          }
+        }
+        toast.success(`Fixed descriptions for ${count} products!`);
+        fetchData();
+      } else {
+        toast.info('No products found with that description line.');
+      }
+    } catch (error: any) {
+      toast.error(`Failed to fix descriptions: ${error.message}`);
+    } finally {
+      setIsFixingDescriptions(false);
     }
   };
 
@@ -514,6 +552,25 @@ const Admin = () => {
                       </div>
                       <input type="file" accept=".csv" className="hidden" onChange={handleBulkUpload} disabled={isUploadingBulk} />
                     </label>
+                  </CardContent>
+                </Card>
+
+                {/* Quick Fixes Card */}
+                <Card className="border-0 shadow-sm">
+                  <CardHeader><CardTitle className="flex items-center"><Wrench className="w-5 h-5 mr-2" /> Quick Fixes</CardTitle></CardHeader>
+                  <CardContent>
+                    <Button 
+                      variant="outline" 
+                      onClick={handleFixDescriptions} 
+                      disabled={isFixingDescriptions}
+                      className="w-full text-sm"
+                    >
+                      {isFixingDescriptions ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+                      Remove "Premium" text from Acrylics
+                    </Button>
+                    <p className="text-xs text-gray-500 mt-3 text-center">
+                      This will scan all products and remove the "Acrylic sheets are positioned as more premium..." line from their descriptions.
+                    </p>
                   </CardContent>
                 </Card>
               </div>
