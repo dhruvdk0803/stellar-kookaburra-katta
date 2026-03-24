@@ -168,7 +168,7 @@ const ProductDetail = () => {
               <img src={selectedImage} alt={product.name} className="w-full h-full object-contain" />
             </div>
             {allImages.length > 1 && (
-              <div className="flex gap-3 overflow-x-auto pb-2 snap-x">
+              <div className="flex gap-3 overflow-x-auto pb-2 snap-x [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
                 {allImages.map((img: string, idx: number) => (
                   <button 
                     key={idx}
@@ -213,15 +213,16 @@ const ProductDetail = () => {
 
             <p className="text-primary font-bold text-3xl md:text-4xl mb-6">₹{product.price}</p>
             
-            {/* Added whitespace-pre-wrap to support multi-line descriptions */}
             <p className="text-gray-600 mb-6 font-poppins text-sm md:text-base whitespace-pre-wrap line-clamp-6">
               {product.description || 'No description available.'}
             </p>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6 bg-gray-50 p-4 rounded-xl">
+            {/* Quick Specs */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mb-6 bg-gray-50 p-4 rounded-xl">
               {Object.entries(specs).map(([key, value]) => (
-                <div key={key} className="text-sm flex justify-between sm:block border-b sm:border-0 border-gray-200 pb-2 sm:pb-0 last:border-0 last:pb-0">
-                  <span className="font-semibold text-gray-700">{key}:</span> <span className="text-gray-600">{value as string}</span>
+                <div key={key} className="text-sm flex flex-col border-b sm:border-0 border-gray-200 pb-2 sm:pb-0 last:border-0 last:pb-0">
+                  <span className="font-semibold text-gray-700">{key}</span> 
+                  <span className="text-gray-600 mt-0.5">{value as string}</span>
                 </div>
               ))}
             </div>
@@ -261,22 +262,21 @@ const ProductDetail = () => {
 
         <div className="max-w-6xl mx-auto mt-12">
           <Tabs defaultValue="description" className="w-full">
-            <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 h-auto gap-2 bg-transparent">
-              <TabsTrigger value="description" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full py-2 border border-gray-200 data-[state=active]:border-primary">Description</TabsTrigger>
-              <TabsTrigger value="specs" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full py-2 border border-gray-200 data-[state=active]:border-primary">Specs</TabsTrigger>
-              <TabsTrigger value="reviews" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full py-2 border border-gray-200 data-[state=active]:border-primary">Reviews ({reviews.length})</TabsTrigger>
+            <TabsList className="flex w-full overflow-x-auto h-auto gap-2 bg-transparent justify-start pb-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+              <TabsTrigger value="description" className="flex-shrink-0 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full py-2 px-5 border border-gray-200 data-[state=active]:border-primary text-sm">Description</TabsTrigger>
+              <TabsTrigger value="specs" className="flex-shrink-0 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full py-2 px-5 border border-gray-200 data-[state=active]:border-primary text-sm">Specs</TabsTrigger>
+              <TabsTrigger value="reviews" className="flex-shrink-0 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full py-2 px-5 border border-gray-200 data-[state=active]:border-primary text-sm">Reviews ({reviews.length})</TabsTrigger>
             </TabsList>
-            <div className="bg-white border border-gray-100 rounded-2xl p-6 mt-4 shadow-sm">
+            <div className="bg-white border border-gray-100 rounded-2xl p-4 sm:p-6 mt-4 shadow-sm">
               <TabsContent value="description" className="mt-0">
-                {/* Added whitespace-pre-wrap here as well */}
-                <p className="text-gray-700 font-poppins leading-relaxed whitespace-pre-wrap">{product.description}</p>
+                <p className="text-gray-700 font-poppins leading-relaxed whitespace-pre-wrap text-sm sm:text-base">{product.description}</p>
               </TabsContent>
               <TabsContent value="specs" className="mt-0">
                 <ul className="space-y-3">
                   {Object.entries(specs).map(([key, value]) => (
-                    <li key={key} className="flex justify-between text-sm border-b border-gray-100 pb-2 last:border-0 last:pb-0">
+                    <li key={key} className="flex flex-col sm:flex-row sm:justify-between text-sm border-b border-gray-100 pb-3 last:border-0 last:pb-0 gap-1">
                       <span className="font-medium text-gray-700">{key}</span>
-                      <span className="text-gray-600">{value as string}</span>
+                      <span className="text-gray-600 sm:text-right">{value as string}</span>
                     </li>
                   ))}
                 </ul>
@@ -284,7 +284,7 @@ const ProductDetail = () => {
               <TabsContent value="reviews" className="mt-0 space-y-8">
                 
                 {/* Write a Review Form */}
-                <div className="bg-gray-50 p-6 rounded-xl border border-gray-100">
+                <div className="bg-gray-50 p-4 sm:p-6 rounded-xl border border-gray-100">
                   <h3 className="text-lg font-semibold text-gray-900 mb-4">Write a Review</h3>
                   {user ? (
                     <form onSubmit={handleSubmitReview} className="space-y-4">
@@ -310,17 +310,17 @@ const ProductDetail = () => {
                           value={newComment}
                           onChange={(e) => setNewComment(e.target.value)}
                           rows={4}
-                          className="bg-white"
+                          className="bg-white text-sm sm:text-base"
                         />
                       </div>
-                      <Button type="submit" disabled={isSubmittingReview} className="rounded-full">
+                      <Button type="submit" disabled={isSubmittingReview} className="w-full sm:w-auto rounded-full">
                         {isSubmittingReview ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
                         Submit Review
                       </Button>
                     </form>
                   ) : (
                     <div className="text-center py-4">
-                      <p className="text-gray-600 mb-4">Please log in to leave a review.</p>
+                      <p className="text-gray-600 mb-4 text-sm sm:text-base">Please log in to leave a review.</p>
                       <Link to="/login">
                         <Button variant="outline" className="rounded-full">Log In</Button>
                       </Link>
@@ -332,28 +332,28 @@ const ProductDetail = () => {
                 <div>
                   <h3 className="text-lg font-semibold text-gray-900 mb-6">Customer Reviews</h3>
                   {reviews.length === 0 ? (
-                    <p className="text-gray-500 italic">No reviews yet. Be the first to review this product!</p>
+                    <p className="text-gray-500 italic text-sm sm:text-base">No reviews yet. Be the first to review this product!</p>
                   ) : (
                     <div className="space-y-6">
                       {reviews.map((review) => (
                         <div key={review.id} className="border-b border-gray-100 pb-6 last:border-0 last:pb-0">
                           <div className="flex items-center justify-between mb-2">
                             <div className="flex items-center space-x-3">
-                              <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center text-primary font-bold">
+                              <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center text-primary font-bold flex-shrink-0">
                                 {(review.profiles?.name || 'U').charAt(0).toUpperCase()}
                               </div>
                               <div>
-                                <p className="font-medium text-gray-900">{review.profiles?.name || 'Anonymous User'}</p>
+                                <p className="font-medium text-gray-900 text-sm sm:text-base">{review.profiles?.name || 'Anonymous User'}</p>
                                 <p className="text-xs text-gray-500">{new Date(review.created_at).toLocaleDateString()}</p>
                               </div>
                             </div>
                             <div className="flex">
                               {[...Array(5)].map((_, i) => (
-                                <Star key={i} className={cn("h-4 w-4", i < review.rating ? "text-amber-400 fill-amber-400" : "text-gray-200")} />
+                                <Star key={i} className={cn("h-3 w-3 sm:h-4 sm:w-4", i < review.rating ? "text-amber-400 fill-amber-400" : "text-gray-200")} />
                               ))}
                             </div>
                           </div>
-                          <p className="text-gray-700 mt-3 pl-13">{review.comment}</p>
+                          <p className="text-gray-700 mt-3 pl-0 sm:pl-13 text-sm sm:text-base">{review.comment}</p>
                         </div>
                       ))}
                     </div>
@@ -367,8 +367,8 @@ const ProductDetail = () => {
 
         {/* Related Products Section */}
         {relatedProducts.length > 0 && (
-          <div className="max-w-6xl mx-auto mt-24">
-            <h2 className="text-3xl font-playfair font-bold text-gray-900 mb-8 text-center md:text-left">You Might Also Like</h2>
+          <div className="max-w-6xl mx-auto mt-16 md:mt-24">
+            <h2 className="text-2xl md:text-3xl font-playfair font-bold text-gray-900 mb-6 md:mb-8 text-center md:text-left">You Might Also Like</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
               {relatedProducts.map((rp) => (
                 <ProductCard
