@@ -43,7 +43,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
 
     // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      
+      // INTERCEPT PASSWORD RECOVERY
+      if (event === 'PASSWORD_RECOVERY') {
+        // When the user clicks the reset link in their email, this event fires.
+        // We force a redirect to the reset-password page so they can set a new one.
+        window.location.href = '/reset-password';
+        return;
+      }
+
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
