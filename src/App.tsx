@@ -34,6 +34,9 @@ import Returns from './pages/Returns';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsOfService from './pages/TermsOfService';
 
+// New Plumbing Page
+import Plumbing from './pages/Plumbing';
+
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -48,6 +51,7 @@ const App = () => (
               <Routes>
                 <Route path="/" element={<Index />} />
                 <Route path="/shop" element={<Shop />} />
+                <Route path="/plumbing" element={<Plumbing />} /> {/* New Route */}
                 <Route path="/product/:id" element={<ProductDetail />} />
                 <Route path="/about" element={<About />} />
                 <Route path="/projects" element={<Projects />} />
