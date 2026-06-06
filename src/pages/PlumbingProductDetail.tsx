@@ -2,115 +2,144 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ShoppingCart, Heart, Loader2, Star, ShieldCheck, ChevronLeft } from 'lucide-react';
+import { ShoppingCart, Heart, ShieldCheck, ChevronLeft } from 'lucide-react';
 import Navigation from '@/components/Navigation';
 import Footer from '@/components/Footer';
 import { useCart } from '@/contexts/CartContext';
 import { useWishlist } from '@/contexts/WishlistContext';
 import { cn } from '@/lib/utils';
 
+interface PipeSize {
+  inches: string;
+  mm: string;
+  qty: number;
+  price: number;
+}
+
+interface PipeProduct {
+  id: string;
+  name: string;
+  description: string;
+  price: number;
+  image: string;
+  images: string[];
+  category: string;
+  subcategory: string;
+  stock: number;
+  specs: Record<string, string>;
+  sizes: PipeSize[];
+}
+
 const pipeImage = '/images/plumbing/cpvc-pipe.jpg';
 
-const plumbingProductsData: { [key: string]: any } = {
-  'pipe-sch80': {
-    id: 'pipe-sch80',
-    name: 'PIPE SCH-80 (3 MTR./5MTR.)',
-    description: 'High-pressure CPVC pipe for water supply systems. Made from high-quality CPVC material, these pipes are designed to withstand high pressure and temperature conditions. Ideal for industrial applications, water distribution systems, and high-pressure plumbing installations.',
-    price: 1200,
-    image: pipeImage,
-    images: [pipeImage],
-    category: 'Plumbing',
-    subcategory: 'CPVC Pipes',
-    stock: 100,
-    specs: {
-      'Material': 'CPVC',
-      'Length': '3 MTR./5MTR.',
-      'Pressure Rating': 'High Pressure',
-      'Usage': 'Industrial, Water Distribution',
-      'Standard': 'ASTM F441'
-    },
-    sizes: [
-      { inches: '2.50"', mm: '65', qty: 8, price: 1200 },
-      { inches: '3"', mm: '80', qty: 5, price: 1500 },
-      { inches: '4"', mm: '100', qty: 4, price: 2200 },
-    ]
+const pipeSch80: PipeProduct = {
+  id: 'pipe-sch80',
+  name: 'PIPE SCH-80 (3 MTR./5MTR.)',
+  description: 'High-pressure CPVC pipe for water supply systems. Made from high-quality CPVC material, these pipes are designed to withstand high pressure and temperature conditions. Ideal for industrial applications, water distribution systems, and high-pressure plumbing installations.',
+  price: 1200,
+  image: pipeImage,
+  images: [pipeImage],
+  category: 'Plumbing',
+  subcategory: 'CPVC Pipes',
+  stock: 100,
+  specs: {
+    'Material': 'CPVC',
+    'Length': '3 MTR./5MTR.',
+    'Pressure Rating': 'High Pressure',
+    'Usage': 'Industrial, Water Distribution',
+    'Standard': 'ASTM F441'
   },
-  'pipe-sch40': {
-    id: 'pipe-sch40',
-    name: 'PIPE SCH-40 (3 MTR./5MTR.)',
-    description: 'Standard CPVC pipe for residential and commercial use. These pipes offer excellent chemical resistance and durability for various plumbing applications. Perfect for water supply lines, drainage systems, and general plumbing installations.',
-    price: 950,
-    image: pipeImage,
-    images: [pipeImage],
-    category: 'Plumbing',
-    subcategory: 'CPVC Pipes',
-    stock: 150,
-    specs: {
-      'Material': 'CPVC',
-      'Length': '3 MTR./5MTR.',
-      'Pressure Rating': 'Standard',
-      'Usage': 'Residential, Commercial',
-      'Standard': 'ASTM F441'
-    },
-    sizes: [
-      { inches: '2.50"', mm: '65', qty: 8, price: 950 },
-      { inches: '3"', mm: '80', qty: 5, price: 1200 },
-      { inches: '4"', mm: '100', qty: 4, price: 1800 },
-    ]
+  sizes: [
+    { inches: '2.50"', mm: '65', qty: 8, price: 1200 },
+    { inches: '3"', mm: '80', qty: 5, price: 1500 },
+    { inches: '4"', mm: '100', qty: 4, price: 2200 }
+  ]
+};
+
+const pipeSch40: PipeProduct = {
+  id: 'pipe-sch40',
+  name: 'PIPE SCH-40 (3 MTR./5MTR.)',
+  description: 'Standard CPVC pipe for residential and commercial use. These pipes offer excellent chemical resistance and durability for various plumbing applications. Perfect for water supply lines, drainage systems, and general plumbing installations.',
+  price: 950,
+  image: pipeImage,
+  images: [pipeImage],
+  category: 'Plumbing',
+  subcategory: 'CPVC Pipes',
+  stock: 150,
+  specs: {
+    'Material': 'CPVC',
+    'Length': '3 MTR./5MTR.',
+    'Pressure Rating': 'Standard',
+    'Usage': 'Residential, Commercial',
+    'Standard': 'ASTM F441'
   },
-  'pipe-sdr11': {
-    id: 'pipe-sdr11',
-    name: 'PIPE SDR-11 (3 MTR./5MTR.)',
-    description: 'Light-duty CPVC pipe for low-pressure applications. Designed for residential water supply systems and irrigation applications. Easy to install and provides reliable performance for everyday plumbing needs.',
-    price: 700,
-    image: pipeImage,
-    images: [pipeImage],
-    category: 'Plumbing',
-    subcategory: 'CPVC Pipes',
-    stock: 200,
-    specs: {
-      'Material': 'CPVC',
-      'Length': '3 MTR./5MTR.',
-      'Pressure Rating': 'Low Pressure',
-      'Usage': 'Residential, Irrigation',
-      'Standard': 'ASTM F442'
-    },
-    sizes: [
-      { inches: '1/2"', mm: '15', qty: 50, price: 700 },
-      { inches: '3/4"', mm: '20', qty: 50, price: 850 },
-      { inches: '1"', mm: '25', qty: 40, price: 1100 },
-      { inches: '1.25"', mm: '32', qty: 25, price: 1400 },
-      { inches: '1.50"', mm: '40', qty: 10, price: 1700 },
-      { inches: '2"', mm: '50', qty: 10, price: 2100 },
-    ]
+  sizes: [
+    { inches: '2.50"', mm: '65', qty: 8, price: 950 },
+    { inches: '3"', mm: '80', qty: 5, price: 1200 },
+    { inches: '4"', mm: '100', qty: 4, price: 1800 }
+  ]
+};
+
+const pipeSdr11: PipeProduct = {
+  id: 'pipe-sdr11',
+  name: 'PIPE SDR-11 (3 MTR./5MTR.)',
+  description: 'Light-duty CPVC pipe for low-pressure applications. Designed for residential water supply systems and irrigation applications. Easy to install and provides reliable performance for everyday plumbing needs.',
+  price: 700,
+  image: pipeImage,
+  images: [pipeImage],
+  category: 'Plumbing',
+  subcategory: 'CPVC Pipes',
+  stock: 200,
+  specs: {
+    'Material': 'CPVC',
+    'Length': '3 MTR./5MTR.',
+    'Pressure Rating': 'Low Pressure',
+    'Usage': 'Residential, Irrigation',
+    'Standard': 'ASTM F442'
   },
-  'pipe-sdr135': {
-    id: 'pipe-sdr135',
-    name: 'PIPE SDR-13.5 (3 MTR./5MTR.)',
-    description: 'Heavy-duty CPVC pipe for industrial applications. Engineered for maximum durability and pressure resistance. Suitable for chemical processing plants, industrial water systems, and high-demand commercial applications.',
-    price: 1500,
-    image: pipeImage,
-    images: [pipeImage],
-    category: 'Plumbing',
-    subcategory: 'CPVC Pipes',
-    stock: 50,
-    specs: {
-      'Material': 'CPVC',
-      'Length': '3 MTR./5MTR.',
-      'Pressure Rating': 'Heavy Duty',
-      'Usage': 'Industrial, Chemical Processing',
-      'Standard': 'ASTM F442'
-    },
-    sizes: [
-      { inches: '1/2"', mm: '15', qty: 50, price: 1500 },
-      { inches: '3/4"', mm: '20', qty: 50, price: 1750 },
-      { inches: '1"', mm: '25', qty: 40, price: 2100 },
-      { inches: '1.25"', mm: '32', qty: 25, price: 2500 },
-      { inches: '1.50"', mm: '40', qty: 10, price: 2900 },
-      { inches: '2"', mm: '50', qty: 10, price: 3400 },
-    ]
-  }
-];
+  sizes: [
+    { inches: '1/2"', mm: '15', qty: 50, price: 700 },
+    { inches: '3/4"', mm: '20', qty: 50, price: 850 },
+    { inches: '1"', mm: '25', qty: 40, price: 1100 },
+    { inches: '1.25"', mm: '32', qty: 25, price: 1400 },
+    { inches: '1.50"', mm: '40', qty: 10, price: 1700 },
+    { inches: '2"', mm: '50', qty: 10, price: 2100 }
+  ]
+};
+
+const pipeSdr135: PipeProduct = {
+  id: 'pipe-sdr135',
+  name: 'PIPE SDR-13.5 (3 MTR./5MTR.)',
+  description: 'Heavy-duty CPVC pipe for industrial applications. Engineered for maximum durability and pressure resistance. Suitable for chemical processing plants, industrial water systems, and high-demand commercial applications.',
+  price: 1500,
+  image: pipeImage,
+  images: [pipeImage],
+  category: 'Plumbing',
+  subcategory: 'CPVC Pipes',
+  stock: 50,
+  specs: {
+    'Material': 'CPVC',
+    'Length': '3 MTR./5MTR.',
+    'Pressure Rating': 'Heavy Duty',
+    'Usage': 'Industrial, Chemical Processing',
+    'Standard': 'ASTM F442'
+  },
+  sizes: [
+    { inches: '1/2"', mm: '15', qty: 50, price: 1500 },
+    { inches: '3/4"', mm: '20', qty: 50, price: 1750 },
+    { inches: '1"', mm: '25', qty: 40, price: 2100 },
+    { inches: '1.25"', mm: '32', qty: 25, price: 2500 },
+    { inches: '1.50"', mm: '40', qty: 10, price: 2900 },
+    { inches: '2"', mm: '50', qty: 10, price: 3400 }
+  ]
+};
+
+const plumbingProductsData: Record<string, PipeProduct> = {
+  'pipe-sch80': pipeSch80,
+  'pipe-sch40': pipeSch40,
+  'pipe-sdr11': pipeSdr11,
+  'pipe-sdr135': pipeSdr135
+};
 
 const PlumbingProductDetail = () => {
   const { id } = useParams<{ id: string }>();
@@ -155,7 +184,6 @@ const PlumbingProductDetail = () => {
       <Navigation />
       <div className="py-8 md:py-12 px-4">
         <div className="max-w-6xl mx-auto">
-          {/* Breadcrumb */}
           <Link to="/plumbing" className="flex items-center text-gray-500 hover:text-primary mb-6 text-sm">
             <ChevronLeft className="h-4 w-4 mr-1" />
             Back to Plumbing Products
@@ -163,7 +191,6 @@ const PlumbingProductDetail = () => {
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 md:gap-12">
             
-            {/* Image Gallery */}
             <div className="space-y-4">
               <div className="aspect-square md:aspect-auto md:h-[500px] w-full rounded-2xl overflow-hidden border border-gray-100 shadow-sm bg-gray-50">
                 <img 
@@ -198,7 +225,6 @@ const PlumbingProductDetail = () => {
                 {product.description}
               </p>
 
-              {/* Size Selector */}
               <div className="mb-6 bg-gray-50 p-4 rounded-xl">
                 <h3 className="font-semibold text-gray-900 mb-3 flex items-center">
                   Size & Packaging
@@ -216,7 +242,7 @@ const PlumbingProductDetail = () => {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
-                      {product.sizes.map((size: any, idx: number) => (
+                      {product.sizes.map((size, idx) => (
                         <tr 
                           key={idx} 
                           onClick={() => setSelectedSize(idx)}
@@ -245,9 +271,8 @@ const PlumbingProductDetail = () => {
                 </div>
               </div>
 
-              {/* Quick Specs */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mb-6 bg-gray-50 p-4 rounded-xl">
-                {Object.entries(product.specs).map(([key, value]: [string, any]) => (
+                {Object.entries(product.specs).map(([key, value]) => (
                   <div key={key} className="text-sm flex flex-col border-b sm:border-0 border-gray-200 pb-2 sm:pb-0 last:border-0 last:pb-0">
                     <span className="font-semibold text-gray-700">{key}</span> 
                     <span className="text-gray-600 mt-0.5">{value}</span>
@@ -278,7 +303,6 @@ const PlumbingProductDetail = () => {
                 </Button>
               </div>
 
-              {/* Trust Badges */}
               <div className="flex items-start gap-3 bg-green-50/50 border border-green-100 p-4 rounded-xl mt-4">
                 <ShieldCheck className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
                 <p className="text-sm text-gray-700">
@@ -288,7 +312,6 @@ const PlumbingProductDetail = () => {
             </div>
           </div>
 
-          {/* Tabs Section */}
           <div className="max-w-6xl mx-auto mt-12">
             <Tabs defaultValue="description" className="w-full">
               <TabsList className="flex w-full overflow-x-auto h-auto gap-2 bg-transparent justify-start pb-2">
@@ -313,7 +336,7 @@ const PlumbingProductDetail = () => {
                 </TabsContent>
                 <TabsContent value="specifications" className="mt-0">
                   <ul className="space-y-3">
-                    {Object.entries(product.specs).map(([key, value]: [string, any]) => (
+                    {Object.entries(product.specs).map(([key, value]) => (
                       <li key={key} className="flex flex-col sm:flex-row sm:justify-between text-sm border-b border-gray-100 pb-3 last:border-0 last:pb-0 gap-1">
                         <span className="font-medium text-gray-700">{key}</span>
                         <span className="text-gray-600 sm:text-right">{value}</span>
@@ -338,7 +361,7 @@ const PlumbingProductDetail = () => {
                         </tr>
                       </thead>
                       <tbody>
-                        {product.sizes.map((size: any, idx: number) => (
+                        {product.sizes.map((size, idx) => (
                           <tr key={idx} className="hover:bg-gray-50">
                             <td className="px-4 py-3 border border-gray-200 font-medium">{size.inches}</td>
                             <td className="px-4 py-3 border border-gray-200">{size.mm}</td>
