@@ -3,6 +3,7 @@ import Navigation from '@/components/Navigation';
 import Footer from '@/components/Footer';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
+import { ShoppingCart } from 'lucide-react';
 import ShopFilters from '@/components/ShopFilters';
 import ProductCard from '@/components/ProductCard';
 
