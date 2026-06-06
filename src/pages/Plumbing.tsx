@@ -17,9 +17,8 @@ const Plumbing = () => {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* CPVC Pipes */}
             <div key="pipe-sch80" className="bg-white rounded-2xl shadow-sm hover:shadow-xl transition-all">
-              <img 
-                src="dyad-media://media/stellar-kookaburra-hop/.dyad/media/0f75e9a4369e2217dc5b167061baa7f6ee28a6fc4b855a7ca28e02adc57671b0.jpg" 
-                alt="CPVC Pipe SCH-80" 
+              <img                 src="https://via.placeholder.com/400x400?text=CPVC+Pipe+SCH-80" 
+                alt="CPVC Pipe SCH-80 (3 MTR./5MTR.)" 
                 className="w-full h-64 object-cover" 
               />
               <div className="p-4">
@@ -34,9 +33,8 @@ const Plumbing = () => {
             </div>
 
             <div key="pipe-sch40" className="bg-white rounded-2xl shadow-sm hover:shadow-xl transition-all">
-              <img 
-                src="dyad-media://media/stellar-kookaburra-hop/.dyad/media/0f75e9a4369e2217dc5b167061baa7f6ee28a6fc4b855a7ca28e02adc57671b0.jpg" 
-                alt="CPVC Pipe SCH-40" 
+              <img                 src="https://via.placeholder.com/400x400?text=CPVC+Pipe+SCH-40" 
+                alt="CPVC Pipe SCH-40 (3 MTR./5MTR.)" 
                 className="w-full h-64 object-cover" 
               />
               <div className="p-4">
@@ -52,8 +50,7 @@ const Plumbing = () => {
 
             <div key="pipe-sdr11" className="bg-white rounded-2xl shadow-sm hover:shadow-xl transition-all">
               <img 
-                src="dyad-media://media/stellar-kookaburra-hop/.dyad/media/0f75e9a4369e2217dc5b167061baa7f6ee28a6fc4b855a7ca28e02adc57671b0.jpg" 
-                alt="CPVC Pipe SDR-11" 
+                src="https://via.placeholder.com/400x400?text=CPVC+Pipe+SDR-11"                 alt="CPVC Pipe SDR-11 (3 MTR./5MTR.)" 
                 className="w-full h-64 object-cover" 
               />
               <div className="p-4">
@@ -69,8 +66,8 @@ const Plumbing = () => {
 
             <div key="pipe-sdr135" className="bg-white rounded-2xl shadow-sm hover:shadow-xl transition-all">
               <img 
-                src="dyad-media://media/stellar-kookaburra-hop/.dyad/media/0f75e9a4369e2217dc5b167061baa7f6ee28a6fc4b855a7ca28e02adc57671b0.jpg" 
-                alt="CPVC Pipe SDR-13.5" 
+                src="https://via.placeholder.com/400x400?text=CPVC+Pipe+SDR-13.5" 
+                alt="CPVC Pipe SDR-13.5 (3 MTR./5MTR.)" 
                 className="w-full h-64 object-cover" 
               />
               <div className="p-4">
