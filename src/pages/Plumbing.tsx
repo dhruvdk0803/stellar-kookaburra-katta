@@ -4,7 +4,7 @@ import Footer from '@/components/Footer';
 import ShopFilters from '@/components/ShopFilters';
 import { Link } from 'react-router-dom';
 
-const pipeImage = "dyad-media://media/stellar-kookaburra-hop/.dyad/media/0f75e9a4369e2217dc5b167061baa7f6ee28a6fc4b855a7ca28e02adc57671b0.jpg";
+const pipeImage = '/images/plumbing/cpvc-pipe.jpg';
 
 const plumbingProducts = [
   {
@@ -58,11 +58,14 @@ const Plumbing = () => {
               {plumbingProducts.map((product) => (
                 <Link key={product.id} to={`/plumbing/${product.id}`}>
                   <div className="bg-white rounded-2xl shadow-sm hover:shadow-xl transition-all overflow-hidden group h-full flex flex-col">
-                    <div className="relative overflow-hidden">
+                    <div className="relative overflow-hidden bg-gray-100">
                       <img 
                         src={product.image} 
                         alt={product.name} 
-                        className="w-full h-56 sm:h-64 object-cover group-hover:scale-105 transition-transform duration-500" 
+                        className="w-full h-56 sm:h-64 object-cover group-hover:scale-105 transition-transform duration-500"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1581094794329-c8112a89af12?w=600&h=600&fit=crop';
+                        }}
                       />
                     </div>
                     <div className="p-4 flex flex-col flex-grow">

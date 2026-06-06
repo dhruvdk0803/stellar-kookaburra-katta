@@ -9,7 +9,7 @@ import { useCart } from '@/contexts/CartContext';
 import { useWishlist } from '@/contexts/WishlistContext';
 import { cn } from '@/lib/utils';
 
-const pipeImage = "dyad-media://media/stellar-kookaburra-hop/.dyad/media/0f75e9a4369e2217dc5b167061baa7f6ee28a6fc4b855a7ca28e02adc57671b0.jpg";
+const pipeImage = '/images/plumbing/cpvc-pipe.jpg';
 
 const plumbingProductsData: { [key: string]: any } = {
   'pipe-sch80': {
@@ -110,7 +110,7 @@ const plumbingProductsData: { [key: string]: any } = {
       { inches: '2"', mm: '50', qty: 10, price: 3400 },
     ]
   }
-};
+];
 
 const PlumbingProductDetail = () => {
   const { id } = useParams<{ id: string }>();
@@ -166,7 +166,14 @@ const PlumbingProductDetail = () => {
             {/* Image Gallery */}
             <div className="space-y-4">
               <div className="aspect-square md:aspect-auto md:h-[500px] w-full rounded-2xl overflow-hidden border border-gray-100 shadow-sm bg-gray-50">
-                <img src={product.images[selectedImage]} alt={product.name} className="w-full h-full object-contain" />
+                <img 
+                  src={product.images[selectedImage]} 
+                  alt={product.name} 
+                  className="w-full h-full object-contain"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1581094794329-c8112a89af12?w=800&h=800&fit=crop';
+                  }}
+                />
               </div>
             </div>
 
