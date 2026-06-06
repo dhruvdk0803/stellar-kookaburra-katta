@@ -1,11 +1,9 @@
 import React from 'react';
 import Navigation from '@/components/Navigation';
 import Footer from '@/components/Footer';
-import { Button } from '@/components/ui/button';
-import { Link } from 'react-router-dom';
-import { ShoppingCart } from 'lucide-react';
 import ShopFilters from '@/components/ShopFilters';
 import ProductCard from '@/components/ProductCard';
+import { useWishlist } from '@/contexts/WishlistContext';
 
 const pipeImage = "dyad-media://media/stellar-kookaburra-hop/.dyad/media/0f75e9a4369e2217dc5b167061baa7f6ee28a6fc4b855a7ca28e02adc57671b0.jpg";
 
@@ -17,7 +15,14 @@ const plumbingProducts = [
     price: 1200,
     image: pipeImage,
     category: 'Plumbing',
-    stock: 100
+    stock: 100,
+    subcategory: 'CPVC Pipes',
+    specs: {
+      'Material': 'CPVC',
+      'Length': '3 MTR./5MTR.',
+      'Pressure Rating': 'High Pressure',
+      'Usage': 'Industrial, Water Distribution'
+    }
   },
   {
     id: 'pipe-sch40',
@@ -26,7 +31,14 @@ const plumbingProducts = [
     price: 950,
     image: pipeImage,
     category: 'Plumbing',
-    stock: 150
+    stock: 150,
+    subcategory: 'CPVC Pipes',
+    specs: {
+      'Material': 'CPVC',
+      'Length': '3 MTR./5MTR.',
+      'Pressure Rating': 'Standard',
+      'Usage': 'Residential, Commercial'
+    }
   },
   {
     id: 'pipe-sdr11',
@@ -35,7 +47,14 @@ const plumbingProducts = [
     price: 700,
     image: pipeImage,
     category: 'Plumbing',
-    stock: 200
+    stock: 200,
+    subcategory: 'CPVC Pipes',
+    specs: {
+      'Material': 'CPVC',
+      'Length': '3 MTR./5MTR.',
+      'Pressure Rating': 'Low Pressure',
+      'Usage': 'Residential, Irrigation'
+    }
   },
   {
     id: 'pipe-sdr135',
@@ -44,41 +63,47 @@ const plumbingProducts = [
     price: 1500,
     image: pipeImage,
     category: 'Plumbing',
-    stock: 50
+    stock: 50,
+    subcategory: 'CPVC Pipes',
+    specs: {
+      'Material': 'CPVC',
+      'Length': '3 MTR./5MTR.',
+      'Pressure Rating': 'Heavy Duty',
+      'Usage': 'Industrial, Chemical Processing'
+    }
   }
 ];
 
 const Plumbing = () => {
+  const { isInWishlist, toggleWishlist } = useWishlist();
+
   return (
     <div className="min-h-screen bg-gray-50 font-poppins">
       <Navigation />
       <div className="py-12 px-4">
-        <div className="max-w-7xl mx-auto">
-          <h1 className="text-3xl font-playfair font-bold text-gray-900 mb-16">Plumbing Products</h1>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-            {plumbingProducts.map((product) => (
-              <Link key={product.id} to={`/product/${product.id}`}>
-                <div className="bg-white rounded-2xl shadow-sm hover:shadow-xl transition-all overflow-hidden group">
-                  <img 
-                    src={product.image} 
-                    alt={product.name} 
-                    className="w-full h-64 object-cover group-hover:scale-105 transition-transform duration-300" 
-                  />
-                  <div className="p-6">
-                    <h3 className="text-xl font-semibold text-gray-900 mb-2">{product.name}</h3>
-                    <p className="text-gray-600 text-sm mb-4 line-clamp-3">{product.description}</p>
-                    <div className="flex justify-between items-center">
-                      <p className="text-primary font-bold text-lg">₹{product.price}</p>
-                      <Button variant="ghost" size="sm" className="rounded-full">
-                        <ShoppingCart className="h-4 w-4" />
-                        View Details
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              </Link>
-            ))}
-          </div>
+        <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-4 gap-8">
+          <aside className="hidden lg:block lg:col-span-1 space-y-6">
+            <h2 className="text-2xl font-playfair font-bold text-gray-900">Filters</h2>
+            <ShopFilters 
+              categories={[{ id: 'plumbing', name: 'Plumbing' }]} 
+              onFilterChange={() => {}} 
+              initialFilters={{}} 
+            />
+          </aside>
+          
+          <main className="lg:col-span-3">
+            <h1 className="text-3xl font-playfair font-bold text-gray-900 mb-8">Plumbing Products</h1>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {plumbingProducts.map((product) => (
+                <ProductCard
+                  key={product.id}
+                  product={product}
+                  isInWishlist={isInWishlist(product.id)}
+                  onWishlistToggle={toggleWishlist}
+                />
+              ))}
+            </div>
+          </main>
         </div>
       </div>
       <Footer />
