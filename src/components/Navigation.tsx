@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Search, Heart, ShoppingCart, User, Menu, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -10,9 +10,10 @@ import { supabase } from '@/integrations/supabase/client';
 
 const navItems = [
   { label: 'Home', path: '/' },
-  { label: 'Projects / Inspiration', path: '/projects' },
-  { label: 'About Us', path: '/about' },
-  { label: 'Blog / Ideas', path: '/blog' },
+  { label: 'Plumbing', path: '/plumbing' },
+  { label: 'Projects', path: '/projects' },
+  { label: 'About', path: '/about' },
+  { label: 'Blog', path: '/blog' },
   { label: 'Contact', path: '/contact' },
 ];
 
@@ -31,6 +32,9 @@ const Navigation = () => {
   const searchRef = useRef<HTMLDivElement>(null);
   const { cartCount } = useCart();
   const navigate = useNavigate();
+  const location = useLocation();
+  const isActive = (path: string) =>
+    path === '/' ? location.pathname === '/' : location.pathname.startsWith(path);
 
   // Fetch Categories from Database
   useEffect(() => {
@@ -126,14 +130,16 @@ const Navigation = () => {
           </Link>
 
           {/* Desktop Menu */}
-          <div className="hidden lg:flex items-center space-x-4">
+          <div className="hidden xl:flex items-center space-x-4">
             {/* Nav Links */}
             <div className="flex items-center space-x-4">
               {navItems.map((item) => (
                 <Link
                   key={item.path}
                   to={item.path}
-                  className="text-gray-700 hover:text-primary font-medium transition-all duration-200 px-2 py-2 rounded-md hover:bg-primary/5"
+                  className={`font-medium transition-all duration-200 px-2 py-2 rounded-md hover:bg-primary/5 ${
+                    isActive(item.path) ? 'text-primary bg-primary/5' : 'text-gray-700 hover:text-primary'
+                  }`}
                 >
                   {item.label}
                 </Link>
@@ -258,7 +264,7 @@ const Navigation = () => {
           </div>
 
           {/* Mobile Menu Trigger */}
-          <div className="lg:hidden flex items-center space-x-2">
+          <div className="xl:hidden flex items-center space-x-2">
             <Button variant="ghost" size="icon" asChild className="relative hover:bg-primary/5 rounded-full transition-all duration-200 h-10 w-10 p-0">
               <Link to="/cart">
                 <ShoppingCart className="h-5 w-5 text-gray-700" />
@@ -327,7 +333,11 @@ const Navigation = () => {
                       <Link
                         key={item.path}
                         to={item.path}
-                        className="text-gray-700 hover:text-primary hover:bg-primary/5 py-3 px-3 rounded-md transition-all duration-200 text-lg font-medium"
+                        className={`py-3 px-3 rounded-md transition-all duration-200 text-lg font-medium ${
+                          isActive(item.path)
+                            ? 'text-primary bg-primary/5'
+                            : 'text-gray-700 hover:text-primary hover:bg-primary/5'
+                        }`}
                         onClick={() => setIsMobileMenuOpen(false)}
                       >
                         {item.label}

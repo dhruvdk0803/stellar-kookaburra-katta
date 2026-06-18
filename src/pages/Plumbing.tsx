@@ -1,85 +1,140 @@
-import React from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Navigation from '@/components/Navigation';
 import Footer from '@/components/Footer';
-import ShopFilters from '@/components/ShopFilters';
-import { Link } from 'react-router-dom';
+import ProductCard from '@/components/ProductCard';
+import { useWishlist } from '@/contexts/WishlistContext';
+import { supabase } from '@/integrations/supabase/client';
+import { Loader2 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
-const pipeImage = '/images/plumbing/cpvc-pipe.jpg';
-
-const plumbingProducts = [
-  {
-    id: 'pipe-sch80',
-    name: 'PIPE SCH-80 (3 MTR./5MTR.)',
-    description: 'High-pressure CPVC pipe for water supply systems. Made from high-quality CPVC material, these pipes are designed to withstand high pressure and temperature conditions. Ideal for industrial applications, water distribution systems, and high-pressure plumbing installations.',
-    price: 1200,
-    image: pipeImage,
-  },
-  {
-    id: 'pipe-sch40',
-    name: 'PIPE SCH-40 (3 MTR./5MTR.)',
-    description: 'Standard CPVC pipe for residential and commercial use. These pipes offer excellent chemical resistance and durability for various plumbing applications. Perfect for water supply lines, drainage systems, and general plumbing installations.',
-    price: 950,
-    image: pipeImage,
-  },
-  {
-    id: 'pipe-sdr11',
-    name: 'PIPE SDR-11 (3 MTR./5MTR.)',
-    description: 'Light-duty CPVC pipe for low-pressure applications. Designed for residential water supply systems and irrigation applications. Easy to install and provides reliable performance for everyday plumbing needs.',
-    price: 700,
-    image: pipeImage,
-  },
-  {
-    id: 'pipe-sdr135',
-    name: 'PIPE SDR-13.5 (3 MTR./5MTR.)',
-    description: 'Heavy-duty CPVC pipe for industrial applications. Engineered for maximum durability and pressure resistance. Suitable for chemical processing plants, industrial water systems, and high-demand commercial applications.',
-    price: 1500,
-    image: pipeImage,
-  }
-];
+// Top-level category that groups all APL Apollo building-material products.
+const APOLLO_PARENT_SLUG = 'apollo';
 
 const Plumbing = () => {
+  const { isInWishlist, toggleWishlist } = useWishlist();
+
+  const [products, setProducts] = useState<any[]>([]);
+  const [subcategories, setSubcategories] = useState<any[]>([]);
+  const [activeSub, setActiveSub] = useState<string>('all');
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true);
+
+      // 1. Find the Apollo parent category and its subcategories.
+      const { data: cats } = await supabase
+        .from('categories')
+        .select('id, name, slug, parent_id');
+
+      const parent = cats?.find(
+        (c) => c.slug === APOLLO_PARENT_SLUG || c.name?.toLowerCase() === 'apollo'
+      );
+
+      let subs: any[] = [];
+      let categoryIds: string[] = [];
+      if (parent) {
+        subs = (cats || []).filter((c) => c.parent_id === parent.id);
+        categoryIds = [parent.id, ...subs.map((s) => s.id)];
+      }
+      setSubcategories(subs);
+
+      // 2. Fetch active products belonging to Apollo categories.
+      if (categoryIds.length > 0) {
+        const { data: prods } = await supabase
+          .from('products')
+          .select('*, categories(name, parent_id)')
+          .in('category_id', categoryIds)
+          .eq('is_active', true)
+          .order('price', { ascending: true });
+        setProducts(prods || []);
+      } else {
+        setProducts([]);
+      }
+
+      setLoading(false);
+    };
+
+    fetchData();
+  }, []);
+
+  const visibleProducts = useMemo(() => {
+    if (activeSub === 'all') return products;
+    return products.filter((p) => p.category_id === activeSub);
+  }, [products, activeSub]);
+
   return (
     <div className="min-h-screen bg-gray-50 font-poppins">
       <Navigation />
       <div className="py-12 px-4">
-        <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-4 gap-8">
-          <aside className="hidden lg:block lg:col-span-1 space-y-6">
-            <h2 className="text-2xl font-playfair font-bold text-gray-900">Filters</h2>
-            <ShopFilters 
-              categories={[{ id: 'plumbing', name: 'Plumbing' }]} 
-              onFilterChange={() => {}} 
-              initialFilters={{}} 
-            />
-          </aside>
-          
-          <main className="lg:col-span-3">
-            <h1 className="text-3xl font-playfair font-bold text-gray-900 mb-8">Plumbing Products</h1>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {plumbingProducts.map((product) => (
-                <Link key={product.id} to={`/plumbing/${product.id}`}>
-                  <div className="bg-white rounded-2xl shadow-sm hover:shadow-xl transition-all overflow-hidden group h-full flex flex-col">
-                    <div className="relative overflow-hidden bg-gray-100">
-                      <img 
-                        src={product.image} 
-                        alt={product.name} 
-                        className="w-full h-56 sm:h-64 object-cover group-hover:scale-105 transition-transform duration-500"
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1581094794329-c8112a89af12?w=600&h=600&fit=crop';
-                        }}
-                      />
-                    </div>
-                    <div className="p-4 flex flex-col flex-grow">
-                      <h3 className="text-lg font-semibold text-gray-800 line-clamp-2 leading-tight mb-1 group-hover:text-primary transition-colors">{product.name}</h3>
-                      <p className="text-sm text-gray-500 line-clamp-2 mb-3 flex-grow">{product.description}</p>
-                      <div className="mt-auto pt-3 border-t border-gray-50">
-                        <span className="text-xl font-bold text-primary">Starting ₹{product.price.toLocaleString()}</span>
-                      </div>
-                    </div>
-                  </div>
-                </Link>
+        <div className="max-w-7xl mx-auto">
+          <div className="mb-8">
+            <h1 className="text-3xl md:text-4xl font-playfair font-bold text-gray-900 mb-2">
+              APL Apollo Plumbing & Building Materials
+            </h1>
+            <p className="text-gray-500 max-w-2xl">
+              Genuine APL Apollo CPVC &amp; uPVC pipes, SWR drainage fittings, water tanks and
+              solvent cement — engineered for strong, leak-proof, long-lasting plumbing systems.
+            </p>
+          </div>
+
+          {/* Subcategory filter chips */}
+          {subcategories.length > 0 && (
+            <div className="flex flex-wrap gap-2 mb-8">
+              <button
+                onClick={() => setActiveSub('all')}
+                className={cn(
+                  'px-4 py-2 rounded-full text-sm border transition-colors',
+                  activeSub === 'all'
+                    ? 'bg-primary text-primary-foreground border-primary'
+                    : 'bg-white text-gray-700 border-gray-200 hover:border-primary/50'
+                )}
+              >
+                All ({products.length})
+              </button>
+              {subcategories.map((sub) => {
+                const count = products.filter((p) => p.category_id === sub.id).length;
+                if (count === 0) return null;
+                return (
+                  <button
+                    key={sub.id}
+                    onClick={() => setActiveSub(sub.id)}
+                    className={cn(
+                      'px-4 py-2 rounded-full text-sm border transition-colors',
+                      activeSub === sub.id
+                        ? 'bg-primary text-primary-foreground border-primary'
+                        : 'bg-white text-gray-700 border-gray-200 hover:border-primary/50'
+                    )}
+                  >
+                    {sub.name} ({count})
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {loading ? (
+            <div className="flex justify-center items-center py-20">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+          ) : visibleProducts.length === 0 ? (
+            <div className="text-center py-20">
+              <p className="text-gray-500 text-lg">
+                No Apollo products available yet. Add them from the Admin panel.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {visibleProducts.map((product) => (
+                <ProductCard
+                  key={product.id}
+                  product={product}
+                  isInWishlist={isInWishlist(product.id)}
+                  onWishlistToggle={toggleWishlist}
+                />
               ))}
             </div>
-          </main>
+          )}
         </div>
       </div>
       <Footer />

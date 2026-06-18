@@ -34,9 +34,8 @@ import Returns from './pages/Returns';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsOfService from './pages/TermsOfService';
 
-// Plumbing Pages
+// Plumbing Page (Apollo products, Supabase-driven)
 import Plumbing from './pages/Plumbing';
-import PlumbingProductDetail from './pages/PlumbingProductDetail';
 
 const queryClient = new QueryClient();
 
@@ -53,7 +52,6 @@ const App = () => (
                 <Route path="/" element={<Index />} />
                 <Route path="/shop" element={<Shop />} />
                 <Route path="/plumbing" element={<Plumbing />} />
-                <Route path="/plumbing/:id" element={<PlumbingProductDetail />} />
                 <Route path="/product/:id" element={<ProductDetail />} />
                 <Route path="/about" element={<About />} />
                 <Route path="/projects" element={<Projects />} />
