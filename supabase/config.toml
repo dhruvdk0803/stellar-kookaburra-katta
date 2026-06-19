@@ -1,0 +1,10 @@
+project_id = "jcqqepifotecmrjdyeup"
+
+# PhonePe payment initiation — requires a logged-in user (JWT verified by platform).
+[functions.phonepe-pay]
+verify_jwt = true
+
+# PhonePe status/callback — must be publicly reachable so PhonePe's server
+# can hit the callback URL. It verifies payment by calling PhonePe's status API.
+[functions.phonepe-status]
+verify_jwt = false

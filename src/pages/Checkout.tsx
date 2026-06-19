@@ -6,9 +6,8 @@ import Navigation from '@/components/Navigation';
 import Footer from '@/components/Footer';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Card, CardContent } from '@/components/ui/card';
-import { CreditCard, Smartphone, Clock, Loader2 } from 'lucide-react';
+import { Smartphone, ShieldCheck, Loader2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 
@@ -16,11 +15,9 @@ const Checkout = () => {
   const { cart, clearCart } = useCart();
   const { user, isLoading } = useAuth();
   const [formData, setFormData] = useState({
-    name: '', phone: '', address: '', city: '', state: '', zip: '', payment: 'card',
+    name: '', phone: '', address: '', city: '', state: '', zip: '',
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
-  const [orderId, setOrderId] = useState('');
 
   const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   const shipping = 100;
@@ -36,43 +33,27 @@ const Checkout = () => {
     setIsSubmitting(true);
 
     try {
-      // 1. Create the Order
+      // Hand the order off to PhonePe. The Edge Function recomputes the total
+      // from DB prices, creates the order, and returns the hosted checkout URL.
       const fullAddress = `${formData.address}, ${formData.city}, ${formData.state} ${formData.zip}`;
-      const { data: order, error: orderError } = await supabase
-        .from('orders')
-        .insert({
-          user_id: user.id,
-          total_amount: total,
+      const { data, error } = await supabase.functions.invoke('phonepe-pay', {
+        body: {
+          items: cart.map((item) => ({ product_id: item.id, quantity: item.quantity })),
           address: fullAddress,
-          status: 'pending'
-        })
-        .select()
-        .single();
+          phone: formData.phone,
+        },
+      });
 
-      if (orderError) throw orderError;
+      if (error) throw error;
+      if (data?.error || !data?.redirectUrl) {
+        throw new Error(data?.error || 'Could not start PhonePe payment.');
+      }
 
-      // 2. Create the Order Items
-      const orderItems = cart.map(item => ({
-        order_id: order.id,
-        product_id: item.id,
-        quantity: item.quantity,
-        price: item.price
-      }));
-
-      const { error: itemsError } = await supabase
-        .from('order_items')
-        .insert(orderItems);
-
-      if (itemsError) throw itemsError;
-
-      // 3. Success
-      setOrderId(order.id);
-      clearCart();
-      setSubmitted(true);
+      // Keep the cart until payment succeeds (cleared on the status page).
+      window.location.href = data.redirectUrl;
     } catch (error: any) {
       console.error('Checkout error:', error);
-      toast.error("Failed to place order. Please ensure your cart contains valid products.");
-    } finally {
+      toast.error(error?.message || 'Failed to start payment. Please try again.');
       setIsSubmitting(false);
     }
   };
@@ -105,30 +86,6 @@ const Checkout = () => {
                 </Button>
               </Link>
             </div>
-          </div>
-        </div>
-        <Footer />
-      </div>
-    );
-  }
-
-  if (submitted) {
-    return (
-      <div className="min-h-screen bg-white font-poppins flex flex-col">
-        <Navigation />
-        <div className="flex-1 flex items-center justify-center py-20 px-4">
-          <div className="text-center max-w-md">
-            <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
-              <Clock className="h-10 w-10 text-green-600" />
-            </div>
-            <h2 className="text-3xl font-playfair font-bold text-gray-900 mb-4">Order Placed Successfully!</h2>
-            <p className="text-gray-600 mb-2">Thank you for your purchase.</p>
-            <p className="text-sm text-gray-500 mb-8">Order ID: <span className="font-mono">{orderId.slice(0, 8)}...</span></p>
-            <Link to="/account">
-              <Button className="rounded-full bg-primary hover:bg-primary/90 text-primary-foreground px-8 py-6">
-                View My Orders
-              </Button>
-            </Link>
           </div>
         </div>
         <Footer />
@@ -197,31 +154,24 @@ const Checkout = () => {
               </div>
             </div>
 
-            {/* Payment Methods */}
+            {/* Payment Method */}
             <div className="mb-8">
               <h3 className="font-semibold text-gray-900 mb-4">Payment Method</h3>
-              <RadioGroup value={formData.payment} onValueChange={(value) => setFormData({ ...formData, payment: value })}>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <Card className="border-gray-200">
-                    <CardContent className="p-4 flex items-center space-x-3">
-                      <RadioGroupItem value="card" id="card" />
-                      <label htmlFor="card" className="cursor-pointer flex items-center space-x-2 w-full">
-                        <CreditCard className="h-5 w-5 text-gray-500" />
-                        <span>Credit/Debit Card</span>
-                      </label>
-                    </CardContent>
-                  </Card>
-                  <Card className="border-gray-200">
-                    <CardContent className="p-4 flex items-center space-x-3">
-                      <RadioGroupItem value="upi" id="upi" />
-                      <label htmlFor="upi" className="cursor-pointer flex items-center space-x-2 w-full">
-                        <Smartphone className="h-5 w-5 text-gray-500" />
-                        <span>UPI</span>
-                      </label>
-                    </CardContent>
-                  </Card>
-                </div>
-              </RadioGroup>
+              <Card className="border-primary/30 bg-primary/5">
+                <CardContent className="p-4 flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-full bg-[#5f259f] flex items-center justify-center flex-shrink-0">
+                    <Smartphone className="h-5 w-5 text-white" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-medium text-gray-900">PhonePe</p>
+                    <p className="text-sm text-gray-500">Pay securely via UPI, cards, wallets &amp; net banking</p>
+                  </div>
+                </CardContent>
+              </Card>
+              <p className="text-xs text-gray-400 mt-2 flex items-center gap-1">
+                <ShieldCheck className="h-3.5 w-3.5" />
+                You'll be redirected to PhonePe's secure checkout to complete payment.
+              </p>
             </div>
 
             {/* Order Summary */}

@@ -17,6 +17,7 @@ import Blog from './pages/Blog';
 import Contact from './pages/Contact';
 import Cart from './pages/Cart';
 import Checkout from './pages/Checkout';
+import PaymentStatus from './pages/PaymentStatus';
 import Wishlist from './pages/Wishlist';
 import ProjectDetail from './pages/ProjectDetail';
 import BlogPost from './pages/BlogPost';
@@ -61,6 +62,7 @@ const App = () => (
                 <Route path="/contact" element={<Contact />} />
                 <Route path="/cart" element={<Cart />} />
                 <Route path="/checkout" element={<Checkout />} />
+                <Route path="/payment-status" element={<PaymentStatus />} />
                 <Route path="/wishlist" element={<Wishlist />} />
                 <Route path="/login" element={<Login />} />
                 <Route path="/register" element={<Register />} />
