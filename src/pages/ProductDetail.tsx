@@ -23,6 +23,7 @@ const ProductDetail = () => {
   const [loading, setLoading] = useState(true);
   const [quantity, setQuantity] = useState(1);
   const [selectedImage, setSelectedImage] = useState<string>('');
+  const [selectedVariant, setSelectedVariant] = useState<number>(0);
   
   // Review Form State
   const [newRating, setNewRating] = useState(5);
@@ -46,6 +47,9 @@ const ProductDetail = () => {
       
       if (prodData) {
         setProduct(prodData);
+        const vars = Array.isArray(prodData.variants) ? prodData.variants : [];
+        const defIdx = vars.findIndex((v: any) => v.is_default);
+        setSelectedVariant(defIdx >= 0 ? defIdx : 0);
         const imgs = (prodData.images && prodData.images.length > 0) ? prodData.images : (prodData.image_url ? [prodData.image_url] : ['https://via.placeholder.com/800x800.png?text=No+Image']);
         setSelectedImage(imgs[0]);
         
@@ -148,8 +152,21 @@ const ProductDetail = () => {
     ? (reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length).toFixed(1) 
     : 0;
 
+  const variants: any[] = Array.isArray(product.variants) ? product.variants : [];
+  const activeVariant = variants[selectedVariant];
+  const displayPrice = activeVariant?.price ?? product.price;
+
   const handleAddToCart = () => {
-    addToCart({ id: product.id, name: product.name, price: product.price, image: allImages[0] }, quantity);
+    const variantSuffix = activeVariant && variants.length > 1 ? ` (${activeVariant.label})` : '';
+    addToCart(
+      {
+        id: variantSuffix ? `${product.id}:v${selectedVariant}` : product.id,
+        name: product.name + variantSuffix,
+        price: displayPrice,
+        image: allImages[0],
+      },
+      quantity
+    );
   };
 
   const handleBulkOrder = () => {
@@ -211,8 +228,34 @@ const ProductDetail = () => {
               </div>
             )}
 
-            <p className="text-primary font-bold text-3xl md:text-4xl mb-6">₹{product.price}</p>
-            
+            <p className="text-primary font-bold text-3xl md:text-4xl mb-6">₹{displayPrice}</p>
+
+            {/* Size / Variant selector */}
+            {variants.length > 1 && (
+              <div className="mb-6">
+                <p className="text-sm font-medium text-gray-700 mb-2">Size / Variant</p>
+                <div className="flex flex-wrap gap-2">
+                  {variants.map((v, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => setSelectedVariant(idx)}
+                      className={cn(
+                        'px-4 py-2 rounded-lg text-sm border transition-colors',
+                        selectedVariant === idx
+                          ? 'bg-primary text-primary-foreground border-primary'
+                          : 'bg-white text-gray-700 border-gray-200 hover:border-primary/50'
+                      )}
+                    >
+                      <span className="font-medium">{v.label}</span>
+                      <span className={cn('ml-2', selectedVariant === idx ? 'text-primary-foreground/80' : 'text-gray-500')}>
+                        ₹{v.price}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <p className="text-gray-600 mb-6 font-poppins text-sm md:text-base whitespace-pre-wrap line-clamp-6">
               {product.description || 'No description available.'}
             </p>
