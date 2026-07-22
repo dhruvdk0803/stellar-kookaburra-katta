@@ -7,8 +7,23 @@ import { supabase } from '@/integrations/supabase/client';
 import { Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-// Top-level category that groups all APL Apollo building-material products.
-const APOLLO_PARENT_SLUG = 'apollo';
+// Top-level brand categories shown on the plumbing page.
+const BRANDS = [
+  {
+    slug: 'apollo',
+    label: 'APL Apollo',
+    title: 'APL Apollo Plumbing & Building Materials',
+    blurb:
+      'Genuine APL Apollo CPVC & uPVC pipes, SWR drainage fittings, water tanks and solvent cement — engineered for strong, leak-proof, long-lasting plumbing systems.',
+  },
+  {
+    slug: 'astral',
+    label: 'Astral',
+    title: 'Astral Pipes & Fittings',
+    blurb:
+      'Astral CPVC & uPVC piping systems, DrainPro SWR fittings, solvent cements and water tanks — trusted, ISI/ASTM-compliant plumbing solutions.',
+  },
+];
 
 const Plumbing = () => {
   const { isInWishlist, toggleWishlist } = useWishlist();
@@ -16,19 +31,23 @@ const Plumbing = () => {
   const [products, setProducts] = useState<any[]>([]);
   const [subcategories, setSubcategories] = useState<any[]>([]);
   const [activeSub, setActiveSub] = useState<string>('all');
+  const [activeBrand, setActiveBrand] = useState(BRANDS[0]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
+      setActiveSub('all');
 
-      // 1. Find the Apollo parent category and its subcategories.
+      // 1. Find the brand's parent category and its subcategories.
       const { data: cats } = await supabase
         .from('categories')
         .select('id, name, slug, parent_id');
 
       const parent = cats?.find(
-        (c) => c.slug === APOLLO_PARENT_SLUG || c.name?.toLowerCase() === 'apollo'
+        (c) =>
+          c.slug === activeBrand.slug ||
+          c.name?.toLowerCase() === activeBrand.slug
       );
 
       let subs: any[] = [];
@@ -39,7 +58,7 @@ const Plumbing = () => {
       }
       setSubcategories(subs);
 
-      // 2. Fetch active products belonging to Apollo categories.
+      // 2. Fetch active products belonging to the brand's categories.
       if (categoryIds.length > 0) {
         const { data: prods } = await supabase
           .from('products')
@@ -56,7 +75,7 @@ const Plumbing = () => {
     };
 
     fetchData();
-  }, []);
+  }, [activeBrand]);
 
   const visibleProducts = useMemo(() => {
     if (activeSub === 'all') return products;
@@ -70,12 +89,27 @@ const Plumbing = () => {
         <div className="max-w-7xl mx-auto">
           <div className="mb-8">
             <h1 className="text-3xl md:text-4xl font-playfair font-bold text-gray-900 mb-2">
-              APL Apollo Plumbing & Building Materials
+              {activeBrand.title}
             </h1>
-            <p className="text-gray-500 max-w-2xl">
-              Genuine APL Apollo CPVC &amp; uPVC pipes, SWR drainage fittings, water tanks and
-              solvent cement — engineered for strong, leak-proof, long-lasting plumbing systems.
-            </p>
+            <p className="text-gray-500 max-w-2xl">{activeBrand.blurb}</p>
+          </div>
+
+          {/* Brand tabs */}
+          <div className="flex gap-2 mb-6">
+            {BRANDS.map((brand) => (
+              <button
+                key={brand.slug}
+                onClick={() => setActiveBrand(brand)}
+                className={cn(
+                  'px-5 py-2.5 rounded-lg text-sm font-semibold border transition-colors',
+                  activeBrand.slug === brand.slug
+                    ? 'bg-gray-900 text-white border-gray-900'
+                    : 'bg-white text-gray-700 border-gray-200 hover:border-gray-400'
+                )}
+              >
+                {brand.label}
+              </button>
+            ))}
           </div>
 
           {/* Subcategory filter chips */}
@@ -120,7 +154,7 @@ const Plumbing = () => {
           ) : visibleProducts.length === 0 ? (
             <div className="text-center py-20">
               <p className="text-gray-500 text-lg">
-                No Apollo products available yet. Add them from the Admin panel.
+                No {activeBrand.label} products available yet. Add them from the Admin panel.
               </p>
             </div>
           ) : (

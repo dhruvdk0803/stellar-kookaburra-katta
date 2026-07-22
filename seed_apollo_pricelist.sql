@@ -1263,7 +1263,7 @@ Key features:
 - Corrosion, chemical and weather resistant
 - Smooth bore for efficient flow
 - Easy to install with solvent-weld joints
-- Conforms to IS:4985 standards', 0, '/images/apollo/apollo-compact-long-handle-ball-valve-plain-upvc-pipe-fittings.webp', ARRAY['/images/apollo/apollo-compact-long-handle-ball-valve-plain-upvc-pipe-fittings.webp'], '{"Brand":"APL Apollo","Category":"SWR / uPVC Pipes & Fittings","Material":"uPVC","Size (mm)":"20","Size (inch)":"3/4\"","Item Code":"UMN01220W","Standard Packaging":"10 pcs/box","GST":"18%"}'::jsonb, v_sub1, 100, true),
+- Conforms to IS:4985 standards', 229, '/images/apollo/apollo-compact-long-handle-ball-valve-plain-upvc-pipe-fittings.webp', ARRAY['/images/apollo/apollo-compact-long-handle-ball-valve-plain-upvc-pipe-fittings.webp'], '{"Brand":"APL Apollo","Category":"SWR / uPVC Pipes & Fittings","Material":"uPVC","Size (mm)":"20","Size (inch)":"3/4\"","Item Code":"UMN01220W","Standard Packaging":"10 pcs/box","GST":"18%"}'::jsonb, v_sub1, 100, true),
   ('Apollo SWR Coupler 6" (160mm)', 'APL Apollo SWR (Soil, Waste & Rain) uPVC drainage products are designed for residential and commercial drainage systems, offering long-lasting, leak-proof performance.
 
 Key features:
@@ -1271,7 +1271,7 @@ Key features:
 - Corrosion, chemical and weather resistant
 - Smooth bore for efficient, silent flow
 - Easy to install — Self-Fit (push-fit) and Ringfit options
-- Conforms to IS:13592 standards', 0, '/images/apollo/apollo-coupler-swr-fitting-self-fit-upvc-pipe-fittings.jpg', ARRAY['/images/apollo/apollo-coupler-swr-fitting-self-fit-upvc-pipe-fittings.jpg'], '{"Brand":"APL Apollo","Category":"SWR / uPVC Pipes & Fittings","Material":"uPVC","Size (mm)":"160","Size (inch)":"6\"","Item Code":"PMN032806","Standard Packaging":"24 pcs/box","GST":"18%"}'::jsonb, v_sub1, 100, true),
+- Conforms to IS:13592 standards', 307, '/images/apollo/apollo-coupler-swr-fitting-self-fit-upvc-pipe-fittings.jpg', ARRAY['/images/apollo/apollo-coupler-swr-fitting-self-fit-upvc-pipe-fittings.jpg'], '{"Brand":"APL Apollo","Category":"SWR / uPVC Pipes & Fittings","Material":"uPVC","Size (mm)":"160","Size (inch)":"6\"","Item Code":"PMN032806","Standard Packaging":"24 pcs/box","GST":"18%"}'::jsonb, v_sub1, 100, true),
   ('Apollo SWR End Cap 3/4" (20mm)', 'APL Apollo SWR (Soil, Waste & Rain) uPVC drainage products are designed for residential and commercial drainage systems, offering long-lasting, leak-proof performance.
 
 Key features:
