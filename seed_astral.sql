@@ -4,7 +4,7 @@
 
 ALTER TABLE products ADD COLUMN IF NOT EXISTS variants JSONB DEFAULT '[]'::jsonb;
 
-DO $
+DO $$
 DECLARE
   v_parent UUID;
   v_sub0 UUID;  -- CPVC Pipes & Fittings
