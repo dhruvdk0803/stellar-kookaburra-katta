@@ -12,9 +12,9 @@ const BRANDS = [
   {
     slug: 'apollo',
     label: 'APL Apollo',
-    title: 'APL Apollo Plumbing & Building Materials',
+    title: 'APL Apollo CPVC Pipes & Fittings',
     blurb:
-      'Genuine APL Apollo CPVC & uPVC pipes and fittings — engineered for strong, leak-proof, long-lasting hot and cold water plumbing systems.',
+      'Genuine APL Apollo CPVC pipes and fittings — engineered for strong, leak-proof, long-lasting hot and cold water plumbing systems.',
   },
   {
     slug: 'astral',
@@ -28,8 +28,8 @@ const BRANDS = [
 const Plumbing = () => {
   const { isInWishlist, toggleWishlist } = useWishlist();
 
-  const [products, setProducts] = useState<any[]>([]);
-  const [subcategories, setSubcategories] = useState<any[]>([]);
+  const [allProducts, setAllProducts] = useState<any[]>([]);
+  const [catsByBrand, setCatsByBrand] = useState<Record<string, any[]>>({});
   const [activeSub, setActiveSub] = useState<string>('all');
   const [activeBrand, setActiveBrand] = useState(BRANDS[0]);
   const [loading, setLoading] = useState(true);
@@ -37,28 +37,25 @@ const Plumbing = () => {
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
-      setActiveSub('all');
 
-      // 1. Find the brand's parent category and its subcategories.
       const { data: cats } = await supabase
         .from('categories')
         .select('id, name, slug, parent_id');
 
-      const parent = cats?.find(
-        (c) =>
-          c.slug === activeBrand.slug ||
-          c.name?.toLowerCase() === activeBrand.slug
-      );
-
-      let subs: any[] = [];
-      let categoryIds: string[] = [];
-      if (parent) {
-        subs = (cats || []).filter((c) => c.parent_id === parent.id);
-        categoryIds = [parent.id, ...subs.map((s) => s.id)];
+      // Resolve each brand's subcategories up front so we can tell which brands
+      // actually have anything live and hide the ones that don't.
+      const subsByBrand: Record<string, any[]> = {};
+      const categoryIds: string[] = [];
+      for (const brand of BRANDS) {
+        const parent = cats?.find(
+          (c) => c.slug === brand.slug || c.name?.toLowerCase() === brand.slug
+        );
+        const subs = parent ? (cats || []).filter((c) => c.parent_id === parent.id) : [];
+        subsByBrand[brand.slug] = subs;
+        if (parent) categoryIds.push(parent.id, ...subs.map((s) => s.id));
       }
-      setSubcategories(subs);
+      setCatsByBrand(subsByBrand);
 
-      // 2. Fetch active products belonging to the brand's categories.
       if (categoryIds.length > 0) {
         const { data: prods } = await supabase
           .from('products')
@@ -66,16 +63,42 @@ const Plumbing = () => {
           .in('category_id', categoryIds)
           .eq('is_active', true)
           .order('price', { ascending: true });
-        setProducts(prods || []);
+        setAllProducts(prods || []);
       } else {
-        setProducts([]);
+        setAllProducts([]);
       }
 
       setLoading(false);
     };
 
     fetchData();
-  }, [activeBrand]);
+  }, []);
+
+  const productsForBrand = (slug: string) => {
+    const ids = new Set((catsByBrand[slug] || []).map((s) => s.id));
+    return allProducts.filter((p) => ids.has(p.category_id));
+  };
+
+  // Only offer brands that currently have live products.
+  const availableBrands = useMemo(
+    () => BRANDS.filter((b) => productsForBrand(b.slug).length > 0),
+    [allProducts, catsByBrand]
+  );
+
+  // If the selected brand has nothing live, fall back to the first that does.
+  useEffect(() => {
+    if (loading || availableBrands.length === 0) return;
+    if (!availableBrands.some((b) => b.slug === activeBrand.slug)) {
+      setActiveBrand(availableBrands[0]);
+      setActiveSub('all');
+    }
+  }, [availableBrands, activeBrand, loading]);
+
+  const products = useMemo(
+    () => productsForBrand(activeBrand.slug),
+    [allProducts, catsByBrand, activeBrand]
+  );
+  const subcategories = catsByBrand[activeBrand.slug] || [];
 
   const visibleProducts = useMemo(() => {
     if (activeSub === 'all') return products;
@@ -94,9 +117,9 @@ const Plumbing = () => {
             <p className="text-gray-500 max-w-2xl">{activeBrand.blurb}</p>
           </div>
 
-          {/* Brand tabs */}
-          <div className="flex gap-2 mb-6">
-            {BRANDS.map((brand) => (
+          {/* Brand tabs — only brands with live products */}
+          <div className={cn('flex gap-2 mb-6', availableBrands.length < 2 && 'hidden')}>
+            {availableBrands.map((brand) => (
               <button
                 key={brand.slug}
                 onClick={() => setActiveBrand(brand)}
