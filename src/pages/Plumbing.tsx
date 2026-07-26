@@ -14,14 +14,14 @@ const BRANDS = [
     label: 'APL Apollo',
     title: 'APL Apollo Plumbing & Building Materials',
     blurb:
-      'Genuine APL Apollo CPVC & uPVC pipes, SWR drainage fittings, water tanks and solvent cement — engineered for strong, leak-proof, long-lasting plumbing systems.',
+      'Genuine APL Apollo CPVC & uPVC pipes and fittings — engineered for strong, leak-proof, long-lasting hot and cold water plumbing systems.',
   },
   {
     slug: 'astral',
     label: 'Astral',
     title: 'Astral Pipes & Fittings',
     blurb:
-      'Astral CPVC & uPVC piping systems, DrainPro SWR fittings, solvent cements and water tanks — trusted, ISI/ASTM-compliant plumbing solutions.',
+      'Astral CPVC & uPVC piping systems — trusted, ISI/ASTM-compliant pipes and fittings for reliable water distribution.',
   },
 ];
 

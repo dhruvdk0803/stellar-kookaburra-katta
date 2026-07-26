@@ -45,7 +45,8 @@ const ProductDetail = () => {
         .eq('id', id)
         .single();
       
-      if (prodData) {
+      // Drafted products (is_active = false) stay reachable by direct URL otherwise.
+      if (prodData && prodData.is_active !== false) {
         setProduct(prodData);
         const vars = Array.isArray(prodData.variants) ? prodData.variants : [];
         const defIdx = vars.findIndex((v: any) => v.is_default);
