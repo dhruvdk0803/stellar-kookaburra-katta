@@ -7,10 +7,12 @@ import { Auth } from '@supabase/auth-ui-react';
 import { ThemeSupa } from '@supabase/auth-ui-shared';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useGoogleAuthEnabled } from '@/hooks/useGoogleAuthEnabled';
 
 const Login = () => {
   const navigate = useNavigate();
   const { session } = useAuth();
+  const googleEnabled = useGoogleAuthEnabled();
 
   useEffect(() => {
     if (session) {
@@ -34,7 +36,7 @@ const Login = () => {
                 supabaseClient={supabase}
                 appearance={{ theme: ThemeSupa }}
                 theme="light"
-                providers={['google']}
+                providers={googleEnabled ? ['google'] : []}
                 redirectTo={window.location.origin + '/account'}
               />
               

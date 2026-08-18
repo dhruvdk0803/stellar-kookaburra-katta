@@ -7,9 +7,10 @@ import Footer from '@/components/Footer';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
-import { Smartphone, ShieldCheck, Loader2 } from 'lucide-react';
+import { Smartphone, ShieldCheck, Loader2, AlertCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
+import { MIN_ORDER_VALUE } from '@/lib/constants';
 
 const Checkout = () => {
   const { cart, clearCart } = useCart();
@@ -22,11 +23,17 @@ const Checkout = () => {
   const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   const shipping = 100;
   const total = subtotal + shipping; // GST removed
+  // Minimum order value is checked on the cart subtotal, excluding shipping.
+  const meetsMinimum = subtotal >= MIN_ORDER_VALUE;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) {
       toast.error("You must be logged in to place an order.");
+      return;
+    }
+    if (!meetsMinimum) {
+      toast.error(`Minimum order value is ₹${MIN_ORDER_VALUE.toLocaleString('en-IN')}. Please add more items to your cart.`);
       return;
     }
 
@@ -199,9 +206,22 @@ const Checkout = () => {
               </CardContent>
             </Card>
 
+            {!meetsMinimum && (
+              <div className="mb-6 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4">
+                <AlertCircle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                <div className="text-sm text-amber-800">
+                  <p className="font-semibold">Minimum order value is ₹{MIN_ORDER_VALUE.toLocaleString('en-IN')}</p>
+                  <p className="mt-1">
+                    Your cart subtotal is ₹{subtotal.toFixed(2)}. Add ₹{(MIN_ORDER_VALUE - subtotal).toFixed(2)} more to place this order.{' '}
+                    <Link to="/shop" className="underline font-medium">Continue shopping</Link>
+                  </p>
+                </div>
+              </div>
+            )}
+
             <Button 
               type="submit" 
-              disabled={isSubmitting || cart.length === 0}
+              disabled={isSubmitting || cart.length === 0 || !meetsMinimum}
               className="w-full rounded-full bg-primary hover:bg-primary/90 text-primary-foreground text-lg py-6 shadow-lg"
             >
               {isSubmitting ? <Loader2 className="h-5 w-5 animate-spin" /> : `Pay ₹${total.toFixed(2)}`}

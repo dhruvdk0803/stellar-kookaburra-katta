@@ -17,7 +17,8 @@ const Shipping = () => {
             </section>
 
             <section>
-              <h2 className="text-2xl font-semibold text-gray-900 mb-4">2. Domestic Shipping Rates and Estimates</h2>
+              <h2 className="text-2xl font-semibold text-gray-900 mb-4">2. Delivery Timeline</h2>
+              <p className="mb-4"><strong>The products will be shipped and delivered within 7-10 days.</strong></p>
               <p className="mb-4">Shipping charges for your order will be calculated and displayed at checkout. We offer the following shipping options within India:</p>
               <ul className="list-disc pl-6 space-y-2">
                 <li><strong>Standard Shipping:</strong> 5-7 business days. Free for orders over ₹5,000.</li>
@@ -26,12 +27,17 @@ const Shipping = () => {
             </section>
 
             <section>
-              <h2 className="text-2xl font-semibold text-gray-900 mb-4">3. Bulk and Heavy Items</h2>
+              <h2 className="text-2xl font-semibold text-gray-900 mb-4">3. Minimum Order Value</h2>
+              <p>We accept online orders with a minimum order value of <strong>₹2,000</strong> (excluding shipping charges). Orders below this value cannot be placed through the website — please contact us for smaller requirements.</p>
+            </section>
+
+            <section>
+              <h2 className="text-2xl font-semibold text-gray-900 mb-4">4. Bulk and Heavy Items</h2>
               <p>Due to the nature of our products (Sunmica sheets, Louvers, and Panels), bulk orders or oversized items may require special freight shipping. Our team will contact you directly to arrange the best delivery method and confirm any additional freight charges before processing the order.</p>
             </section>
 
             <section>
-              <h2 className="text-2xl font-semibold text-gray-900 mb-4">4. How do I check the status of my order?</h2>
+              <h2 className="text-2xl font-semibold text-gray-900 mb-4">5. How do I check the status of my order?</h2>
               <p>When your order has shipped, you will receive an email notification from us which will include a tracking number you can use to check its status. Please allow 48 hours for the tracking information to become available.</p>
             </section>
           </div>

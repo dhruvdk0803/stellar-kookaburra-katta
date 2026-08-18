@@ -23,12 +23,14 @@ const Returns = () => {
 
             <section>
               <h2 className="text-2xl font-semibold text-gray-900 mb-4">3. Damages and Issues</h2>
-              <p>Please inspect your order upon reception and contact us immediately if the item is defective, damaged, or if you receive the wrong item, so that we can evaluate the issue and make it right. In the event that your order arrives damaged in any way, please email us as soon as possible at mr.kattas1@gmail.com with your order number and a photo of the item's condition.</p>
+              <p className="mb-4">Please inspect your order upon reception and contact us immediately if the item is defective, damaged, or if you receive the wrong item, so that we can evaluate the issue and make it right. In the event that your order arrives damaged in any way, please email us as soon as possible at mr.kattas1@gmail.com with your order number and a photo of the item's condition.</p>
+              <p><strong>For wrong and defective products the replacement delivery timeframe will be 7-14 days.</strong></p>
             </section>
 
             <section>
               <h2 className="text-2xl font-semibold text-gray-900 mb-4">4. Refunds</h2>
-              <p>We will notify you once we’ve received and inspected your return, and let you know if the refund was approved or not. If approved, you’ll be automatically refunded on your original payment method within 5-7 business days. Please remember it can take some time for your bank or credit card company to process and post the refund too.</p>
+              <p className="mb-4">We will notify you once we’ve received and inspected your return, and let you know if the refund was approved or not.</p>
+              <p><strong>The refunded amount will be automatically credited to your account within 5-7 business days.</strong> Please remember it can take some time for your bank or credit card company to process and post the refund too.</p>
             </section>
           </div>
         </div>

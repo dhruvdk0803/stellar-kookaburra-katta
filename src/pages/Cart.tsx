@@ -3,14 +3,17 @@ import { useCart } from '@/contexts/CartContext';
 import Navigation from '@/components/Navigation';
 import Footer from '@/components/Footer';
 import { Button } from '@/components/ui/button';
-import { Trash2, ArrowRight, ShoppingCart } from 'lucide-react';
+import { Trash2, ArrowRight, ShoppingCart, AlertCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { MIN_ORDER_VALUE } from '@/lib/constants';
 
 const Cart = () => {
   const { cart, updateQuantity, removeFromCart, clearCart } = useCart();
 
   const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   const total = subtotal; // GST removed as prices are inclusive
+  const meetsMinimum = subtotal >= MIN_ORDER_VALUE;
+  const amountToMinimum = MIN_ORDER_VALUE - subtotal;
 
   if (cart.length === 0) {
     return (
@@ -105,12 +108,39 @@ const Cart = () => {
                     <span className="text-xl font-bold text-primary">₹{total.toFixed(2)}</span>
                   </div>
                 </div>
-                <Link to="/checkout" className="block mt-8">
-                  <Button className="w-full rounded-full bg-primary hover:bg-primary/90 text-primary-foreground py-6 text-lg flex items-center justify-center gap-2 shadow-md">
-                    Proceed to Checkout
-                    <ArrowRight className="h-5 w-5" />
-                  </Button>
-                </Link>
+                {!meetsMinimum && (
+                  <div className="mt-6 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4">
+                    <AlertCircle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                    <div className="text-sm text-amber-800">
+                      <p className="font-semibold">Minimum order value is ₹{MIN_ORDER_VALUE.toLocaleString('en-IN')}</p>
+                      <p className="mt-1">Add ₹{amountToMinimum.toFixed(2)} more to your cart to proceed to checkout.</p>
+                    </div>
+                  </div>
+                )}
+
+                {meetsMinimum ? (
+                  <Link to="/checkout" className="block mt-8">
+                    <Button className="w-full rounded-full bg-primary hover:bg-primary/90 text-primary-foreground py-6 text-lg flex items-center justify-center gap-2 shadow-md">
+                      Proceed to Checkout
+                      <ArrowRight className="h-5 w-5" />
+                    </Button>
+                  </Link>
+                ) : (
+                  <div className="mt-6 space-y-3">
+                    <Button
+                      disabled
+                      className="w-full rounded-full bg-primary text-primary-foreground py-6 text-lg flex items-center justify-center gap-2 shadow-md"
+                    >
+                      Proceed to Checkout
+                      <ArrowRight className="h-5 w-5" />
+                    </Button>
+                    <Link to="/shop" className="block">
+                      <Button variant="outline" className="w-full rounded-full py-6 text-base">
+                        Continue Shopping
+                      </Button>
+                    </Link>
+                  </div>
+                )}
                 <p className="text-xs text-gray-500 text-center mt-4">Shipping calculated at checkout</p>
               </div>
             </div>

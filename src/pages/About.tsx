@@ -8,7 +8,8 @@ const About = () => {
       <Navigation />
       <section className="relative h-96 bg-gradient-to-br from-teal-600 to-teal-800 flex items-center justify-center text-white">
         <div className="text-center px-4">
-          <h1 className="text-5xl font-playfair font-bold mb-4">About Katta Interiors</h1>
+          <h1 className="text-5xl font-playfair font-bold mb-2">About Katta Interiors</h1>
+          <p className="text-sm font-poppins font-medium tracking-[0.2em] uppercase text-primary mb-4">Katta Plywood and Hardware</p>
           <p className="text-xl max-w-2xl mx-auto opacity-90">Crafting premium interiors with innovation and elegance.</p>
         </div>
       </section>

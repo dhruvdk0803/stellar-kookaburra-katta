@@ -7,10 +7,12 @@ import { Auth } from '@supabase/auth-ui-react';
 import { ThemeSupa } from '@supabase/auth-ui-shared';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useGoogleAuthEnabled } from '@/hooks/useGoogleAuthEnabled';
 
 const Register = () => {
   const navigate = useNavigate();
   const { session } = useAuth();
+  const googleEnabled = useGoogleAuthEnabled();
 
   useEffect(() => {
     if (session) {
@@ -27,14 +29,14 @@ const Register = () => {
             <CardContent className="p-8">
               <div className="text-center mb-8">
                 <h1 className="text-3xl font-playfair font-bold text-gray-900 mb-2">Create Account</h1>
-                <p className="text-gray-600">Join Katta Interiors today</p>
+                <p className="text-gray-600">Join Katta Plywood and Hardware today</p>
               </div>
               
               <Auth
                 supabaseClient={supabase}
                 appearance={{ theme: ThemeSupa }}
                 theme="light"
-                providers={['google']}
+                providers={googleEnabled ? ['google'] : []}
                 view="sign_up"
                 redirectTo={window.location.origin + '/account'}
               />

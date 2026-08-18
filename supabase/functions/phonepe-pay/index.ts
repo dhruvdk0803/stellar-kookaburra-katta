@@ -81,6 +81,19 @@ Deno.serve(async (req) => {
       subtotal += price * qty;
       orderItems.push({ product_id: it.product_id, quantity: qty, price });
     }
+    // Minimum order value, enforced server-side on the subtotal (excl. shipping)
+    // so it can't be bypassed by calling this function directly.
+    const MIN_ORDER_VALUE = 2000;
+    if (subtotal < MIN_ORDER_VALUE) {
+      return json(
+        {
+          error:
+            `Minimum order value is ₹${MIN_ORDER_VALUE}. Please add more items to your cart.`,
+        },
+        400,
+      );
+    }
+
     const shipping = 100;
     const total = subtotal + shipping;
     if (total <= 0) return json({ error: "Invalid order total" }, 400);

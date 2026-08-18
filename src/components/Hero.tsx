@@ -4,18 +4,20 @@ import { Link } from 'react-router-dom';
 
 const Hero = () => {
   return (
-    <section className="relative h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 via-teal-50 to-gray-100 overflow-hidden">
+    <section className="relative min-h-svh md:h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 via-teal-50 to-gray-100 overflow-hidden">
       <div className="absolute inset-0 bg-cover bg-center opacity-70" style={{ backgroundImage: "url('/images/hero-background.png')" }} />
-      <div className="absolute inset-0 bg-black/20" />
+      {/* Light scrim on mobile so the dark heading stays readable over the photo;
+          the original darker wash is kept from md up. */}
+      <div className="absolute inset-0 bg-white/45 md:bg-black/20" />
       
-      <div className="relative z-10 text-center px-4 max-w-4xl mx-auto">
-        <h1 className="text-4xl md:text-6xl font-playfair font-bold mb-4 leading-tight text-foreground drop-shadow-2xl">
-          Premium Materials
+      <div className="relative z-10 text-center px-6 py-20 md:py-0 max-w-4xl mx-auto">
+        <h1 className="text-[2rem] leading-[1.15] sm:text-4xl md:text-6xl font-playfair font-bold mb-4 md:leading-tight text-balance text-foreground md:drop-shadow-2xl">
+          Premium Materials{' '}
           <br className="hidden md:block" />
           for Modern Spaces
         </h1>
-        <p className="text-lg md:text-xl font-poppins mb-8 max-w-xl mx-auto text-foreground/90 drop-shadow-lg">
-          Durable Sunmica & Panels trusted by designers.
+        <p className="text-base sm:text-lg md:text-xl font-poppins mb-8 max-w-xl mx-auto text-balance text-foreground/90 md:drop-shadow-lg">
+          Durable Sunmica &amp; Panels trusted by designers.
         </p>
         
         <div className="flex flex-col sm:flex-row gap-3 justify-center">

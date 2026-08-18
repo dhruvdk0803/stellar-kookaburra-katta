@@ -125,8 +125,13 @@ const Navigation = () => {
       <div className="max-w-7xl mx-auto px-4">
         <div className="flex justify-between items-center py-3">
           {/* Logo */}
-          <Link to="/" className="text-2xl font-bold font-playfair text-gray-900 hover:text-primary transition-colors duration-200">
-            Katta Interiors
+          <Link to="/" className="group flex flex-col leading-tight hover:text-primary transition-colors duration-200">
+            <span className="text-2xl font-bold font-playfair text-gray-900 group-hover:text-primary transition-colors duration-200">
+              Katta Interiors
+            </span>
+            <span className="text-[10px] sm:text-[11px] font-poppins font-medium tracking-[0.18em] uppercase text-gray-500 group-hover:text-primary transition-colors duration-200">
+              Katta Plywood and Hardware
+            </span>
           </Link>
 
           {/* Desktop Menu */}
