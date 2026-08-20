@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { useCart } from '@/contexts/CartContext';
 import { supabase } from '@/integrations/supabase/client';
+import { filterNonEmptyCategories } from '@/lib/categories';
 
 const navItems = [
   { label: 'Home', path: '/' },
@@ -39,17 +40,23 @@ const Navigation = () => {
   // Fetch Categories from Database
   useEffect(() => {
     const fetchCategories = async () => {
-      const { data, error } = await supabase
-        .from('categories')
-        .select('*')
-        .order('name');
-        
-      if (!error && data) {
-        const mainCats = data.filter(c => !c.parent_id);
+      const [catRes, prodRes] = await Promise.all([
+        supabase.from('categories').select('*').order('name'),
+        supabase.from('products').select('category_id').eq('is_active', true),
+      ]);
+
+      if (!catRes.error && catRes.data) {
+        // Hide categories with no products behind them so the menu never leads
+        // to an empty listing.
+        const stocked = filterNonEmptyCategories(
+          catRes.data,
+          (prodRes.data || []).map((p) => p.category_id),
+        );
+        const mainCats = stocked.filter(c => !c.parent_id);
         const grouped: { [key: string]: any[] } = {};
         
         mainCats.forEach(mc => {
-          grouped[mc.name] = data.filter(c => c.parent_id === mc.id);
+          grouped[mc.name] = stocked.filter(c => c.parent_id === mc.id);
         });
         
         setShopCategories(grouped);

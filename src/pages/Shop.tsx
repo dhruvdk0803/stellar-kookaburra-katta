@@ -10,6 +10,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/co
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Filter, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { filterNonEmptyCategories } from '@/lib/categories';
 
 const Shop = () => {
   const [searchParams] = useSearchParams();
@@ -120,6 +121,13 @@ const Shop = () => {
     setFilters(newFilters);
   };
 
+  // Only offer categories that actually contain products. The full `categories`
+  // list is still used above to resolve parents when filtering.
+  const visibleCategories = React.useMemo(
+    () => filterNonEmptyCategories(categories, allProducts.map((p) => p.category_id)),
+    [categories, allProducts],
+  );
+
   return (
     <div className="min-h-screen bg-white font-poppins">
       <Navigation />
@@ -127,7 +135,7 @@ const Shop = () => {
         <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-4 gap-8">
           <aside className="hidden lg:block lg:col-span-1 space-y-6">
             <h2 className="text-2xl font-playfair font-bold text-gray-900">Filters</h2>
-            <ShopFilters categories={categories} onFilterChange={handleFilterChange} initialFilters={filters} />
+            <ShopFilters categories={visibleCategories} onFilterChange={handleFilterChange} initialFilters={filters} />
           </aside>
 
           <main className="lg:col-span-3">
@@ -161,7 +169,7 @@ const Shop = () => {
                         <SheetTitle>Filters</SheetTitle>
                       </SheetHeader>
                       <div className="py-4">
-                        <ShopFilters categories={categories} onFilterChange={handleFilterChange} initialFilters={filters} />
+                        <ShopFilters categories={visibleCategories} onFilterChange={handleFilterChange} initialFilters={filters} />
                       </div>
                     </SheetContent>
                   </Sheet>

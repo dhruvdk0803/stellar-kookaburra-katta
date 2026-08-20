@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { ArrowRight, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
+import { filterNonEmptyCategories } from '@/lib/categories';
 
 const CategoryHighlights = () => {
   const [categories, setCategories] = useState<any[]>([]);
@@ -10,14 +11,19 @@ const CategoryHighlights = () => {
 
   useEffect(() => {
     const fetchCategories = async () => {
-      // Fetch top-level categories (no parent_id)
-      const { data } = await supabase
-        .from('categories')
-        .select('*')
-        .is('parent_id', null)
-        .limit(4);
-        
-      if (data) setCategories(data);
+      // Fetch the whole tree plus product counts: a top-level category is only
+      // worth showing if it, or one of its subcategories, actually has stock.
+      const [catRes, prodRes] = await Promise.all([
+        supabase.from('categories').select('*').order('name'),
+        supabase.from('products').select('category_id').eq('is_active', true),
+      ]);
+
+      const stocked = filterNonEmptyCategories(
+        catRes.data || [],
+        (prodRes.data || []).map((p) => p.category_id),
+      );
+
+      setCategories(stocked.filter((c) => !c.parent_id).slice(0, 4));
       setLoading(false);
     };
     
