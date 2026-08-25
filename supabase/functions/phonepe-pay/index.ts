@@ -59,27 +59,47 @@ Deno.serve(async (req) => {
 
     const admin = createClient(supabaseUrl, serviceKey);
 
-    // Recompute the total from authoritative DB prices.
-    const ids = [...new Set(items.map((i: any) => i.product_id))];
+    // Cart item ids may carry a variant suffix ("<product-id>:v<index>") when
+    // the shopper picked a size on the product page; the base UUID always
+    // resolves to a real product.
+    const baseIds = [
+      ...new Set(items.map((i: any) => String(i.product_id).split(":v")[0])),
+    ];
     const { data: products, error: prodErr } = await admin
       .from("products")
-      .select("id, price")
-      .in("id", ids);
+      .select("id, price, variants")
+      .in("id", baseIds);
     if (prodErr) throw prodErr;
 
-    const priceMap = new Map(
-      (products || []).map((p: any) => [p.id, Number(p.price)]),
-    );
+    const productMap = new Map((products || []).map((p: any) => [p.id, p]));
     let subtotal = 0;
     const orderItems: any[] = [];
     for (const it of items) {
-      const price = priceMap.get(it.product_id);
-      if (price == null) {
-        return json({ error: `Invalid product: ${it.product_id}` }, 400);
+      const rawId = String(it.product_id);
+      const vMatch = rawId.match(/^(.+):v(\d+)$/);
+      const pid = vMatch ? vMatch[1] : rawId;
+      const product = productMap.get(pid);
+      if (!product) {
+        return json({ error: `Invalid product: ${pid}` }, 400);
+      }
+      // Price comes from the DB variant when one was selected, never the client.
+      let price = Number(product.price);
+      if (vMatch) {
+        const variant = (Array.isArray(product.variants)
+          ? product.variants
+          : []
+        )[parseInt(vMatch[2], 10)];
+        if (!variant) {
+          return json({ error: `Invalid variant for ${pid}` }, 400);
+        }
+        price = Number(variant.price ?? product.price);
+      }
+      if (!Number.isFinite(price) || price <= 0) {
+        return json({ error: `Invalid price for ${pid}` }, 400);
       }
       const qty = Math.max(1, parseInt(it.quantity) || 1);
       subtotal += price * qty;
-      orderItems.push({ product_id: it.product_id, quantity: qty, price });
+      orderItems.push({ product_id: pid, quantity: qty, price });
     }
     // Minimum order value, enforced server-side on the subtotal (excl. shipping)
     // so it can't be bypassed by calling this function directly.
