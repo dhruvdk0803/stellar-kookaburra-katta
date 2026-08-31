@@ -23,3 +23,6 @@ dist-ssr
 *.sln
 *.sw?
 .dyad/
+
+# Local credential drop for scripts/setup-phonepe.sh — never commit
+.phonepe.env

@@ -1,34 +1,17 @@
-// PhonePe (PG / Hermes) payment initiation — Supabase Edge Function (Deno).
+// PhonePe payment initiation — Supabase Edge Function (Deno).
 //
-// Flow: authenticate the user, recompute the order total from authoritative
-// DB prices (never trust the client), create a pending order, sign the request
-// with the PhonePe salt key (X-VERIFY), call /pg/v1/pay, and return the hosted
+// Standard Checkout V2. Flow: authenticate the user, recompute the order total
+// from authoritative DB prices (never trust the client), create a pending
+// order, mint an OAuth token, call /checkout/v2/pay, and return the hosted
 // checkout redirect URL.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-
-const cors = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
-
-function json(obj: unknown, status = 200) {
-  return new Response(JSON.stringify(obj), {
-    status,
-    headers: { ...cors, "Content-Type": "application/json" },
-  });
-}
-
-async function sha256Hex(msg: string): Promise<string> {
-  const buf = await crypto.subtle.digest(
-    "SHA-256",
-    new TextEncoder().encode(msg),
-  );
-  return [...new Uint8Array(buf)]
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-}
+import {
+  authHeaders,
+  cors,
+  getAccessToken,
+  json,
+  pgBase,
+} from "../_shared/phonepe.ts";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
@@ -56,6 +39,9 @@ Deno.serve(async (req) => {
     if (!address || typeof address !== "string") {
       return json({ error: "Address is required" }, 400);
     }
+
+    // Fail fast on missing/bad credentials, before creating an orphan order.
+    const token = await getAccessToken();
 
     const admin = createClient(supabaseUrl, serviceKey);
 
@@ -136,49 +122,48 @@ Deno.serve(async (req) => {
       .insert(orderItems.map((oi) => ({ ...oi, order_id: order.id })));
     if (itemsErr) throw itemsErr;
 
-    // Build & sign the PhonePe pay request.
-    const merchantId = Deno.env.get("PHONEPE_MERCHANT_ID")!;
-    const saltKey = Deno.env.get("PHONEPE_SALT_KEY")!;
-    const saltIndex = Deno.env.get("PHONEPE_SALT_INDEX") || "1";
-    const base =
-      Deno.env.get("PHONEPE_BASE_URL") || "https://api.phonepe.com/apis/hermes";
     const appOrigin = (
       req.headers.get("origin") ||
       Deno.env.get("APP_BASE_URL") ||
       ""
     ).replace(/\/$/, "");
 
+    // V2 payload. merchantOrderId: our UUID (36 chars; '-' is allowed, max 63).
+    // No callbackUrl here — server-to-server callbacks are configured as a
+    // webhook in the PhonePe dashboard; we confirm by polling order status.
     const payload = {
-      merchantId,
-      merchantTransactionId: order.id, // UUID, ≤38 chars, alphanumeric + '-'
-      merchantUserId: user.id.replace(/-/g, "").slice(0, 36),
+      merchantOrderId: order.id,
       amount: Math.round(total * 100), // paise
-      redirectUrl: `${appOrigin}/payment-status?order=${order.id}`,
-      redirectMode: "REDIRECT",
-      callbackUrl: `${supabaseUrl}/functions/v1/phonepe-status?order=${order.id}`,
-      mobileNumber: String(phone || "").replace(/\D/g, "").slice(-10),
-      paymentInstrument: { type: "PAY_PAGE" },
+      expireAfter: 1200,
+      metaInfo: {
+        udf1: user.id,
+        udf2: String(phone || "").replace(/\D/g, "").slice(-10),
+      },
+      paymentFlow: {
+        type: "PG_CHECKOUT",
+        message: "Order payment",
+        merchantUrls: {
+          redirectUrl: `${appOrigin}/payment-status?order=${order.id}`,
+        },
+      },
     };
 
-    const base64 = btoa(JSON.stringify(payload));
-    const xVerify =
-      (await sha256Hex(base64 + "/pg/v1/pay" + saltKey)) + "###" + saltIndex;
-
-    const resp = await fetch(`${base}/pg/v1/pay`, {
+    const resp = await fetch(`${pgBase()}/checkout/v2/pay`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", "X-VERIFY": xVerify },
-      body: JSON.stringify({ request: base64 }),
+      headers: authHeaders(token),
+      body: JSON.stringify(payload),
     });
-    const data = await resp.json();
-    const redirectUrl = data?.data?.instrumentResponse?.redirectInfo?.url;
+    const data = await resp.json().catch(() => ({}));
+    const redirectUrl = data?.redirectUrl;
 
-    if (!redirectUrl) {
+    if (!resp.ok || !redirectUrl) {
       // Roll back the order so failed/blocked attempts don't leave orphans.
       await admin.from("order_items").delete().eq("order_id", order.id);
       await admin.from("orders").delete().eq("id", order.id);
+      console.error("PhonePe pay failed", resp.status, JSON.stringify(data));
       return json(
         {
-          error: "PhonePe initiation failed",
+          error: data?.message || "PhonePe initiation failed",
           code: data?.code || null,
           detail: data,
         },
@@ -188,6 +173,7 @@ Deno.serve(async (req) => {
 
     return json({ redirectUrl, orderId: order.id });
   } catch (e) {
+    console.error("phonepe-pay error", e);
     return json({ error: String((e as Error)?.message || e) }, 500);
   }
 });

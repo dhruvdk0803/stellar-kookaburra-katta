@@ -21,10 +21,20 @@ const PaymentStatus = () => {
     polled.current = true;
 
     let attempts = 0;
-    const maxAttempts = 5;
+    // PhonePe can take a little while to settle; poll every 3s for ~1 minute.
+    const maxAttempts = 20;
 
     const check = async (): Promise<void> => {
       attempts += 1;
+      const retry = () => {
+        if (attempts < maxAttempts) {
+          setStatus('pending');
+          setTimeout(check, 3000);
+        } else {
+          setStatus('failed');
+        }
+      };
+
       try {
         const { data, error } = await supabase.functions.invoke('phonepe-status', {
           body: { order: orderId },
@@ -36,17 +46,14 @@ const PaymentStatus = () => {
           setStatus('success');
           return;
         }
-        // PhonePe may still be processing — retry a few times before giving up.
-        if (data?.code === 'PAYMENT_PENDING' && attempts < maxAttempts) {
-          setStatus('pending');
-          setTimeout(check, 3000);
+        // V2 states: PENDING | COMPLETED | FAILED. Only FAILED is terminal.
+        if (data?.state === 'FAILED') {
+          setStatus('failed');
           return;
         }
-        setStatus(attempts < maxAttempts && data?.state === 'PENDING' ? 'pending' : 'failed');
-        if (attempts < maxAttempts && data?.state === 'PENDING') setTimeout(check, 3000);
+        retry();
       } catch {
-        setStatus(attempts < maxAttempts ? 'pending' : 'failed');
-        if (attempts < maxAttempts) setTimeout(check, 3000);
+        retry();
       }
     };
 
