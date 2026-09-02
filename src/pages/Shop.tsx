@@ -22,6 +22,9 @@ const Shop = () => {
   const [categories, setCategories] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [sortBy, setSortBy] = useState('newest');
+  // Price slider ceiling: the highest-priced active product, rounded up to a
+  // clean step, so premium items (e.g. digital locks) are never filtered out.
+  const [priceMax, setPriceMax] = useState(10000);
 
   const [filters, setFilters] = useState(() => {
     const categoriesFromUrl = searchParams.getAll('category');
@@ -37,13 +40,22 @@ const Shop = () => {
       setLoading(true);
       
       const [prodRes, catRes] = await Promise.all([
-        supabase.from('products').select('*, categories(name, parent_id)').eq('is_active', true),
+        // Explicit limit: PostgREST's server-side default caps at 1000 rows,
+        // which is exactly the catalog size now — without this, the next
+        // upload would silently drop products from the shop.
+        supabase.from('products').select('*, categories(name, parent_id)').eq('is_active', true).limit(5000),
         supabase.from('categories').select('*')
       ]);
       
       if (prodRes.data) {
         setAllProducts(prodRes.data);
         setFilteredProducts(prodRes.data);
+        // Raise the default price ceiling to cover the whole catalog instead
+        // of the old hard-coded ₹10,000 cap.
+        const maxPrice = prodRes.data.reduce((m, p) => Math.max(m, Number(p.price) || 0), 0);
+        const roundedMax = Math.ceil(maxPrice / 1000) * 1000;
+        setPriceMax(roundedMax);
+        setFilters(prev => (prev.price[1] >= roundedMax ? prev : { ...prev, price: [prev.price[0], roundedMax] }));
       }
       if (catRes.data) {
         setCategories(catRes.data);
@@ -135,7 +147,7 @@ const Shop = () => {
         <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-4 gap-8">
           <aside className="hidden lg:block lg:col-span-1 space-y-6">
             <h2 className="text-2xl font-playfair font-bold text-gray-900">Filters</h2>
-            <ShopFilters categories={visibleCategories} onFilterChange={handleFilterChange} initialFilters={filters} />
+            <ShopFilters categories={visibleCategories} onFilterChange={handleFilterChange} filters={filters} priceMax={priceMax} />
           </aside>
 
           <main className="lg:col-span-3">
@@ -169,7 +181,7 @@ const Shop = () => {
                         <SheetTitle>Filters</SheetTitle>
                       </SheetHeader>
                       <div className="py-4">
-                        <ShopFilters categories={visibleCategories} onFilterChange={handleFilterChange} initialFilters={filters} />
+                        <ShopFilters categories={visibleCategories} onFilterChange={handleFilterChange} filters={filters} priceMax={priceMax} />
                       </div>
                     </SheetContent>
                   </Sheet>

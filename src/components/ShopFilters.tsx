@@ -1,34 +1,24 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Slider } from '@/components/ui/slider';
 
 interface ShopFiltersProps {
   categories: any[];
   onFilterChange: (filters: any) => void;
-  initialFilters?: any;
+  filters: any;
+  priceMax: number;
 }
 
-const ShopFilters = ({ categories, onFilterChange, initialFilters = {} }: ShopFiltersProps) => {
-  const [filters, setFilters] = useState({
-    category: initialFilters.category || [],
-    price: initialFilters.price || [0, 10000],
-  });
-
-  useEffect(() => {
-    onFilterChange(filters);
-  }, [filters]);
-
+const ShopFilters = ({ categories, onFilterChange, filters, priceMax }: ShopFiltersProps) => {
   const handleCategoryChange = (categoryName: string) => {
-    setFilters(prev => ({
-      ...prev,
-      category: prev.category.includes(categoryName)
-        ? prev.category.filter((c: string) => c !== categoryName)
-        : [...prev.category, categoryName],
-    }));
+    const category = filters.category.includes(categoryName)
+      ? filters.category.filter((c: string) => c !== categoryName)
+      : [...filters.category, categoryName];
+    onFilterChange({ ...filters, category });
   };
 
   const handlePriceChange = (value: number[]) => {
-    setFilters(prev => ({ ...prev, price: value }));
+    onFilterChange({ ...filters, price: value });
   };
 
   // Group categories for display (Main categories and their subcategories)
@@ -84,7 +74,7 @@ const ShopFilters = ({ categories, onFilterChange, initialFilters = {} }: ShopFi
         <Slider
           value={filters.price}
           onValueChange={handlePriceChange}
-          max={10000}
+          max={priceMax}
           step={100}
           className="w-full"
         />

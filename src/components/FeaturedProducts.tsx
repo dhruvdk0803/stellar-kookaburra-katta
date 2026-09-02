@@ -28,6 +28,7 @@ const FeaturedProducts = () => {
         .from('products')
         .select('*')
         .eq('is_active', true)
+        .order('created_at', { ascending: false })
         .limit(8);
       if (data) setProducts(data);
       setLoading(false);
