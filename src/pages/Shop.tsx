@@ -12,6 +12,28 @@ import { Filter, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { filterNonEmptyCategories } from '@/lib/categories';
 
+// Fetch all active products with pagination. PostgREST caps any single
+// request at 1000 rows regardless of the requested limit, so the catalog
+// must be fetched in 1000-row pages until a short page comes back.
+async function fetchAllProducts(): Promise<any[]> {
+  const PAGE = 1000;
+  let all: any[] = [];
+  let from = 0;
+  for (;;) {
+    const { data, error } = await supabase
+      .from('products')
+      .select('*, categories(name, parent_id)')
+      .eq('is_active', true)
+      .range(from, from + PAGE - 1);
+    if (error) throw error;
+    if (!data || data.length === 0) break;
+    all = all.concat(data);
+    if (data.length < PAGE) break;
+    from += PAGE;
+  }
+  return all;
+}
+
 const Shop = () => {
   const [searchParams] = useSearchParams();
   const location = useLocation();
@@ -40,19 +62,18 @@ const Shop = () => {
       setLoading(true);
       
       const [prodRes, catRes] = await Promise.all([
-        // Explicit limit: PostgREST's server-side default caps at 1000 rows,
-        // which is exactly the catalog size now — without this, the next
-        // upload would silently drop products from the shop.
-        supabase.from('products').select('*, categories(name, parent_id)').eq('is_active', true).limit(5000),
+        // Paged fetch (see fetchAllProducts) — a single request caps at 1000
+        // rows server-side, which would silently hide everything past #1000.
+        fetchAllProducts(),
         supabase.from('categories').select('*')
       ]);
-      
-      if (prodRes.data) {
-        setAllProducts(prodRes.data);
-        setFilteredProducts(prodRes.data);
+
+      if (prodRes) {
+        setAllProducts(prodRes);
+        setFilteredProducts(prodRes);
         // Raise the default price ceiling to cover the whole catalog instead
         // of the old hard-coded ₹10,000 cap.
-        const maxPrice = prodRes.data.reduce((m, p) => Math.max(m, Number(p.price) || 0), 0);
+        const maxPrice = prodRes.reduce((m, p) => Math.max(m, Number(p.price) || 0), 0);
         const roundedMax = Math.ceil(maxPrice / 1000) * 1000;
         setPriceMax(roundedMax);
         setFilters(prev => (prev.price[1] >= roundedMax ? prev : { ...prev, price: [prev.price[0], roundedMax] }));
