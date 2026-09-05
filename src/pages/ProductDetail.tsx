@@ -148,6 +148,12 @@ const ProductDetail = () => {
     'Stock Status': product.stock > 0 ? 'In Stock' : 'Out of Stock',
     'Material': 'Premium Quality'
   };
+  // Internal bookkeeping keys are never customer-facing — hide them from the
+  // specs table: 'Source' (seed-script batch tag), 'Demo Video' and
+  // 'Special Notes' (owner-internal notes mistakenly added in Sep-2026 batches).
+  const customerFacingSpecs = Object.fromEntries(
+    Object.entries(specs).filter(([key]) => !['Source', 'Demo Video', 'Special Notes'].includes(key))
+  );
 
   const averageRating = reviews.length > 0 
     ? (reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length).toFixed(1) 
@@ -263,9 +269,9 @@ const ProductDetail = () => {
 
             {/* Quick Specs */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mb-6 bg-gray-50 p-4 rounded-xl">
-              {Object.entries(specs).map(([key, value]) => (
+              {Object.entries(customerFacingSpecs).map(([key, value]) => (
                 <div key={key} className="text-sm flex flex-col border-b sm:border-0 border-gray-200 pb-2 sm:pb-0 last:border-0 last:pb-0">
-                  <span className="font-semibold text-gray-700">{key}</span> 
+                  <span className="font-semibold text-gray-700">{key}</span>
                   <span className="text-gray-600 mt-0.5">{value as string}</span>
                 </div>
               ))}
@@ -317,7 +323,7 @@ const ProductDetail = () => {
               </TabsContent>
               <TabsContent value="specs" className="mt-0">
                 <ul className="space-y-3">
-                  {Object.entries(specs).map(([key, value]) => (
+                  {Object.entries(customerFacingSpecs).map(([key, value]) => (
                     <li key={key} className="flex flex-col sm:flex-row sm:justify-between text-sm border-b border-gray-100 pb-3 last:border-0 last:pb-0 gap-1">
                       <span className="font-medium text-gray-700">{key}</span>
                       <span className="text-gray-600 sm:text-right">{value as string}</span>
