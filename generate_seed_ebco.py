@@ -123,12 +123,9 @@ def build_specs(p):
         s[k] = v
     for k, v in p["addinfo"].items():
         s[k] = v
-    m = re.search(r"v=([A-Za-z0-9_-]{6,})", p["video"])
-    if m:
-        s["Demo Video"] = "https://youtu.be/" + m.group(1)
+    # Owner decision (2026-09-03): no "Demo Video" and no "Special Notes" specs —
+    # video links and owner return/exchange notes stay out of the specs table.
     s["GST"] = "18%"
-    if p["notes"]:
-        s["Special Notes"] = " - ".join(p["notes"])
     s["Source"] = SOURCE_TAG
     return s
 

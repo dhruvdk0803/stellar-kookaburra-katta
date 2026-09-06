@@ -49,7 +49,7 @@ Max opening angle 90° with full overlay
 Die cast body for strength', 492, '/images/ebco/hinges/ebco-hinge-4a.jpg', ARRAY['/images/ebco/hinges/ebco-hinge-4a.jpg', '/images/ebco/hinges/ebco-hinge-4b.jpg'], '{"Brand": "Ebco", "Category": "Hinges", "Item Code": "PH-40", "Finish": "Nickel Plated", "Item": "Plano Hinge", "Size": "40mm", "Caution": "Do not chisel. - Hinges must not be hammered.", "GST": "18%", "Source": "ebco-hinges-septemberbatch2"}'::jsonb, NULL, v_ebco, 100, true),
   ('Recessed Hinge 35 - Soft Close', 'For shutter up to (H)3000 x (W)650mm, thickness: 26 to 40mm
 Load up to 35Kg
-For Wood & Aluminium profile shutters, with 3D adjustment and opening angle up to 105°', 8450, '/images/ebco/hinges/ebco-hinge-5a.jpg', ARRAY['/images/ebco/hinges/ebco-hinge-5a.jpg', '/images/ebco/hinges/ebco-hinge-5b.jpg', '/images/ebco/hinges/ebco-hinge-5c.jpg'], '{"Brand": "Ebco", "Category": "Hinges", "Demo Video": "https://youtu.be/br7AWF-Hi9s", "GST": "18%", "Source": "ebco-hinges-septemberbatch2"}'::jsonb, '[{"label": "Left", "price": 8450, "is_default": true}, {"label": "Right", "price": 8450, "is_default": false}]'::jsonb, v_ebco, 100, true),
+For Wood & Aluminium profile shutters, with 3D adjustment and opening angle up to 105°', 8450, '/images/ebco/hinges/ebco-hinge-5a.jpg', ARRAY['/images/ebco/hinges/ebco-hinge-5a.jpg', '/images/ebco/hinges/ebco-hinge-5b.jpg', '/images/ebco/hinges/ebco-hinge-5c.jpg'], '{"Brand": "Ebco", "Category": "Hinges", "GST": "18%", "Source": "ebco-hinges-septemberbatch2"}'::jsonb, '[{"label": "Left", "price": 8450, "is_default": true}, {"label": "Right", "price": 8450, "is_default": false}]'::jsonb, v_ebco, 100, true),
   ('Hinge for Aluminium Profile 3D - With Linear Mounting Plate', 'Specially designed hinge with linear mounting plate for the Glass shutter Al. profiles.
 Available in Overlay & Half Overlay
 Hinge opening angle: 105°
@@ -57,7 +57,7 @@ Glass THK: 4mm
 Finish:
 Hinge: Nickel Plated, Titanium', 600, '/images/ebco/hinges/ebco-hinge-6a.jpg', ARRAY['/images/ebco/hinges/ebco-hinge-6a.jpg', '/images/ebco/hinges/ebco-hinge-6b.jpg'], '{"Brand": "Ebco", "Category": "Hinges", "GST": "18%", "Source": "ebco-hinges-septemberbatch2"}'::jsonb, '[{"label": "0 crank", "price": 600, "is_default": true}, {"label": "8 crank", "price": 600, "is_default": false}]'::jsonb, v_ebco, 100, true),
   ('Hinge For Aluminium Profile 3D', 'Specially designed for Al. Profile Shutter
-Available in Overlay & Half Overlay', 580, '/images/ebco/hinges/ebco-hinge-7a.jpg', ARRAY['/images/ebco/hinges/ebco-hinge-7a.jpg'], '{"Brand": "Ebco", "Category": "Hinges", "Demo Video": "https://youtu.be/7JPGj4W6GKI", "GST": "18%", "Source": "ebco-hinges-septemberbatch2"}'::jsonb, '[{"label": "0 crank", "price": 580, "is_default": true}, {"label": "8 crank", "price": 580, "is_default": false}]'::jsonb, v_ebco, 100, true),
+Available in Overlay & Half Overlay', 580, '/images/ebco/hinges/ebco-hinge-7a.jpg', ARRAY['/images/ebco/hinges/ebco-hinge-7a.jpg'], '{"Brand": "Ebco", "Category": "Hinges", "GST": "18%", "Source": "ebco-hinges-septemberbatch2"}'::jsonb, '[{"label": "0 crank", "price": 580, "is_default": true}, {"label": "8 crank", "price": 580, "is_default": false}]'::jsonb, v_ebco, 100, true),
   ('Blind corner Hinge- 3D-Soft close', '3D Adjustment
 Max. opening: 90°
 In-built soft close mechanism prevents shutter from banging
@@ -76,7 +76,7 @@ Max. recommended shutter size with 2 hinges: Width≤600mm, Height≤2100mm
 Max. recommended shutter weight to use with 2 hinge ≤25kg
 Shutter thickness: 16-30mm
 Max cabinet side panel thickness: 25mm
-50000 Cycle tested', 5450, '/images/ebco/hinges/ebco-hinge-10a.jpg', ARRAY['/images/ebco/hinges/ebco-hinge-10a.jpg', '/images/ebco/hinges/ebco-hinge-10b.jpg', '/images/ebco/hinges/ebco-hinge-10c.jpg', '/images/ebco/hinges/ebco-hinge-10d.jpg', '/images/ebco/hinges/ebco-hinge-10e.jpg'], '{"Brand": "Ebco", "Category": "Hinges", "Demo Video": "https://youtu.be/br7AWF-Hi9s", "GST": "18%", "Source": "ebco-hinges-septemberbatch2"}'::jsonb, '[{"label": "Left", "price": 5450, "is_default": true}, {"label": "Right", "price": 5450, "is_default": false}]'::jsonb, v_ebco, 100, true),
+50000 Cycle tested', 5450, '/images/ebco/hinges/ebco-hinge-10a.jpg', ARRAY['/images/ebco/hinges/ebco-hinge-10a.jpg', '/images/ebco/hinges/ebco-hinge-10b.jpg', '/images/ebco/hinges/ebco-hinge-10c.jpg', '/images/ebco/hinges/ebco-hinge-10d.jpg', '/images/ebco/hinges/ebco-hinge-10e.jpg'], '{"Brand": "Ebco", "Category": "Hinges", "GST": "18%", "Source": "ebco-hinges-septemberbatch2"}'::jsonb, '[{"label": "Left", "price": 5450, "is_default": true}, {"label": "Right", "price": 5450, "is_default": false}]'::jsonb, v_ebco, 100, true),
   ('Thick Door Hinge 15-35mm with 3D mounting plate', 'Now with 3D adjustable mounting plate
 Specially designed hinge for shutter thickness of 15-35mm
 Max opening: 95°
@@ -94,7 +94,7 @@ Max Door Weight with 2 hinges - 40 Kgs, 80 Kgs and 120 Kgs
 Min door thickness - 35 mm, 40 mm and 45 mm
 Max door width - 850 mm, 1000 mm and 1400 mm
 Max opening - 180°', 3778, '/images/ebco/hinges/ebco-hinge-13a.jpg', ARRAY['/images/ebco/hinges/ebco-hinge-13a.jpg'], '{"Brand": "Ebco", "Category": "Hinges", "GST": "18%", "Source": "ebco-hinges-septemberbatch2"}'::jsonb, '[{"label": "(For minimum Door thickness 35 mm)", "price": 3778, "is_default": true}, {"label": "(For minimum Door thickness 40 mm)", "price": 4557, "is_default": false}, {"label": "(For minimum Door thickness 45 mm)", "price": 7624, "is_default": false}]'::jsonb, v_ebco, 100, true),
-  ('Concealed Corner Hinge', 'SS 304', 532, '/images/ebco/hinges/ebco-hinge-14a.jpg', ARRAY['/images/ebco/hinges/ebco-hinge-14a.jpg'], '{"Brand": "Ebco", "Category": "Hinges", "Demo Video": "https://youtu.be/Lg261nrgikc", "GST": "18%", "Source": "ebco-hinges-septemberbatch2"}'::jsonb, '[{"label": "side Hung - 80 (with New Bevelled Groove)", "price": 532, "is_default": true}, {"label": "side Hung - 120 (with New Bevelled Groove)", "price": 696, "is_default": false}]'::jsonb, v_ebco, 100, true),
+  ('Concealed Corner Hinge', 'SS 304', 532, '/images/ebco/hinges/ebco-hinge-14a.jpg', ARRAY['/images/ebco/hinges/ebco-hinge-14a.jpg'], '{"Brand": "Ebco", "Category": "Hinges", "GST": "18%", "Source": "ebco-hinges-septemberbatch2"}'::jsonb, '[{"label": "side Hung - 80 (with New Bevelled Groove)", "price": 532, "is_default": true}, {"label": "side Hung - 120 (with New Bevelled Groove)", "price": 696, "is_default": false}]'::jsonb, v_ebco, 100, true),
   ('Thick Door Hinge - Soft Close', 'Available in Full Overlay, Half Overlay & Inset
 Soft Close mechanism prevents shutters from banging.
 Max. Opening : 95°

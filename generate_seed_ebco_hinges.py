@@ -132,9 +132,8 @@ def build_specs(p):
             s[glyph(k.strip())] = val
     if p.get("caution_lines"):
         s["Caution"] = glyph(" - ".join(l.strip() for l in p["caution_lines"] if l.strip()))
-    m = re.search(r"v=([A-Za-z0-9_-]{6,})", (p.get("youtube") or "").strip())
-    if m:
-        s["Demo Video"] = "https://youtu.be/" + m.group(1)
+    # Owner decision (2026-09-03): no "Demo Video" spec — video links stay out
+    # of the specs table. (YouTube URLs otherwise left unused.)
     s["GST"] = "18%"
     s["Source"] = SOURCE_TAG
     return s
@@ -325,7 +324,7 @@ def validate(products, groups):
     n_demo = sum(1 for s in specs if "Demo Video" in s)
     n_caution = sum(1 for s in specs if "Caution" in s)
     check(ok_specs, "no label-as-value / placeholder '-' / empty spec values; Brand+Category+GST+Source on every row")
-    check(n_demo == 4, "4 Demo Video specs (found %d)" % n_demo)
+    check(n_demo == 0, "0 Demo Video specs - removed per owner (found %d)" % n_demo)
     check(n_caution == 8, "8 Caution specs (found %d)" % n_caution)
 
     # 5. names ---------------------------------------------------------------
