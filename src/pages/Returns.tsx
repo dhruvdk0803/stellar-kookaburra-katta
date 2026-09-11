@@ -23,7 +23,7 @@ const Returns = () => {
 
             <section>
               <h2 className="text-2xl font-semibold text-gray-900 mb-4">3. Damages and Issues</h2>
-              <p className="mb-4">Please inspect your order upon reception and contact us immediately if the item is defective, damaged, or if you receive the wrong item, so that we can evaluate the issue and make it right. In the event that your order arrives damaged in any way, please email us as soon as possible at mr.kattas1@gmail.com with your order number and a photo of the item's condition.</p>
+              <p className="mb-4">Please inspect your order upon reception and contact us immediately if the item is defective, damaged, or if you receive the wrong item, so that we can evaluate the issue and make it right. In the event that your order arrives damaged in any way, please email us as soon as possible at kattainterior@gmail.com with your order number and a photo of the item's condition.</p>
               <p><strong>For wrong and defective products the replacement delivery timeframe will be 7-14 days.</strong></p>
             </section>
 

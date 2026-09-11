@@ -177,7 +177,7 @@ const ProductDetail = () => {
   };
 
   const handleBulkOrder = () => {
-    window.open('mailto:info@kattainteriors.com?subject=Bulk Order Inquiry: ' + product.name, '_blank');
+    window.open('mailto:kattainterior@gmail.com?subject=Bulk Order Inquiry: ' + product.name, '_blank');
   };
 
   return (
