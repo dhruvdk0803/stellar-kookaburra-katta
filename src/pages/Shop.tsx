@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Filter, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { filterNonEmptyCategories } from '@/lib/categories';
+import { brandsIn, productBrand } from '@/lib/brands';
 
 // Fetch all active products with pagination. PostgREST caps any single
 // request at 1000 rows regardless of the requested limit, so the catalog
@@ -47,11 +48,15 @@ const Shop = () => {
   // Price slider ceiling: the highest-priced active product, rounded up to a
   // clean step, so premium items (e.g. digital locks) are never filtered out.
   const [priceMax, setPriceMax] = useState(10000);
+  // Brands present in the current category/search selection (before brand
+  // filtering), so we only show brand chips when there is more than one.
+  const [availableBrands, setAvailableBrands] = useState<string[]>([]);
 
   const [filters, setFilters] = useState(() => {
     const categoriesFromUrl = searchParams.getAll('category');
     return {
       category: categoriesFromUrl.length > 0 ? categoriesFromUrl : [],
+      brand: [],
       price: [0, 10000],
     };
   });
@@ -119,12 +124,24 @@ const Shop = () => {
       });
     }
     
-    // 3. Price Filter
+    // 3. Brand Filter — only meaningful when a material has >1 brand.
+    // Brands offered are recomputed from the current category/search selection
+    // so the chips always reflect what is actually visible.
+    setAvailableBrands(brandsIn(newProducts, categories));
+
+    if (filters.brand && filters.brand.length > 0) {
+      const activeBrands = filters.brand.map((b: string) => b.toLowerCase().trim());
+      newProducts = newProducts.filter(p =>
+        activeBrands.includes(productBrand(p, categories).toLowerCase().trim())
+      );
+    }
+
+    // 4. Price Filter
     if (filters.price && filters.price.length === 2) {
       newProducts = newProducts.filter(p => p.price >= filters.price[0] && p.price <= filters.price[1]);
     }
 
-    // 4. Sorting
+    // 5. Sorting
     if (sortBy === 'price-asc') {
       newProducts.sort((a, b) => a.price - b.price);
     } else if (sortBy === 'price-desc') {
@@ -154,6 +171,15 @@ const Shop = () => {
     setFilters(newFilters);
   };
 
+  const toggleBrand = (brand: string) => {
+    setFilters(prev => ({
+      ...prev,
+      brand: prev.brand.includes(brand)
+        ? prev.brand.filter((b: string) => b !== brand)
+        : [...prev.brand, brand],
+    }));
+  };
+
   // Only offer categories that actually contain products. The full `categories`
   // list is still used above to resolve parents when filtering.
   const visibleCategories = React.useMemo(
@@ -168,7 +194,7 @@ const Shop = () => {
         <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-4 gap-8">
           <aside className="hidden lg:block lg:col-span-1 space-y-6">
             <h2 className="text-2xl font-playfair font-bold text-gray-900">Filters</h2>
-            <ShopFilters categories={visibleCategories} onFilterChange={handleFilterChange} filters={filters} priceMax={priceMax} />
+            <ShopFilters categories={visibleCategories} onFilterChange={handleFilterChange} filters={filters} priceMax={priceMax} availableBrands={availableBrands} />
           </aside>
 
           <main className="lg:col-span-3">
@@ -202,7 +228,7 @@ const Shop = () => {
                         <SheetTitle>Filters</SheetTitle>
                       </SheetHeader>
                       <div className="py-4">
-                        <ShopFilters categories={visibleCategories} onFilterChange={handleFilterChange} filters={filters} priceMax={priceMax} />
+                        <ShopFilters categories={visibleCategories} onFilterChange={handleFilterChange} filters={filters} priceMax={priceMax} availableBrands={availableBrands} />
                       </div>
                     </SheetContent>
                   </Sheet>

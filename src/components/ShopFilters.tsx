@@ -7,14 +7,23 @@ interface ShopFiltersProps {
   onFilterChange: (filters: any) => void;
   filters: any;
   priceMax: number;
+  availableBrands?: string[];
 }
 
-const ShopFilters = ({ categories, onFilterChange, filters, priceMax }: ShopFiltersProps) => {
+const ShopFilters = ({ categories, onFilterChange, filters, priceMax, availableBrands = [] }: ShopFiltersProps) => {
   const handleCategoryChange = (categoryName: string) => {
     const category = filters.category.includes(categoryName)
       ? filters.category.filter((c: string) => c !== categoryName)
       : [...filters.category, categoryName];
     onFilterChange({ ...filters, category });
+  };
+
+  const handleBrandChange = (brand: string) => {
+    const brandArr = filters.brand || [];
+    const next = brandArr.includes(brand)
+      ? brandArr.filter((b: string) => b !== brand)
+      : [...brandArr, brand];
+    onFilterChange({ ...filters, brand: next });
   };
 
   const handlePriceChange = (value: number[]) => {
@@ -68,6 +77,27 @@ const ShopFilters = ({ categories, onFilterChange, filters, priceMax }: ShopFilt
           </div>
         )}
       </div>
+
+      {availableBrands.length > 1 && (
+        <div>
+          <h3 className="font-semibold text-gray-900 mb-4">Brand</h3>
+          <div className="flex flex-wrap gap-2">
+            {availableBrands.map(brand => (
+              <button
+                key={brand}
+                onClick={() => handleBrandChange(brand)}
+                className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${
+                  (filters.brand || []).includes(brand)
+                    ? 'bg-primary text-primary-foreground border-primary'
+                    : 'bg-white text-gray-700 border-gray-200 hover:border-primary/50'
+                }`}
+              >
+                {brand}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div>
         <h3 className="font-semibold text-gray-900 mb-4">Price Range</h3>
