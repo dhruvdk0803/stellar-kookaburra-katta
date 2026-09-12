@@ -21,7 +21,9 @@ const PaymentStatus = () => {
     polled.current = true;
 
     let attempts = 0;
-    // PhonePe can take a little while to settle; poll every 3s for ~1 minute.
+    // The Razorpay checkout handler verifies the signature server-side before
+    // redirecting here; poll the order row briefly in case the DB update lands
+    // just after the redirect.
     const maxAttempts = 20;
 
     const check = async (): Promise<void> => {
@@ -36,19 +38,16 @@ const PaymentStatus = () => {
       };
 
       try {
-        const { data, error } = await supabase.functions.invoke('phonepe-status', {
-          body: { order: orderId },
-        });
+        const { data, error } = await supabase
+          .from('orders')
+          .select('status')
+          .eq('id', orderId)
+          .single();
         if (error) throw error;
 
-        if (data?.success) {
+        if (data?.status === 'confirmed') {
           clearCart();
           setStatus('success');
-          return;
-        }
-        // V2 states: PENDING | COMPLETED | FAILED. Only FAILED is terminal.
-        if (data?.state === 'FAILED') {
-          setStatus('failed');
           return;
         }
         retry();

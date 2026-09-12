@@ -24,5 +24,5 @@ dist-ssr
 *.sw?
 .dyad/
 
-# Local credential drop for scripts/setup-phonepe.sh — never commit
-.phonepe.env
+# Local credential drop for scripts/setup-razorpay.sh — never commit
+.razorpay.env

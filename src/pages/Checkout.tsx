@@ -7,13 +7,44 @@ import Footer from '@/components/Footer';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
-import { Smartphone, ShieldCheck, Loader2, AlertCircle } from 'lucide-react';
+import { CreditCard, ShieldCheck, Loader2, AlertCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { MIN_ORDER_VALUE } from '@/lib/constants';
 
+declare global {
+  interface RazorpayPaymentResponse {
+    razorpay_order_id: string;
+    razorpay_payment_id: string;
+    razorpay_signature: string;
+  }
+
+  interface RazorpayOptions {
+    key: string;
+    amount: number;
+    currency: string;
+    name: string;
+    description: string;
+    order_id: string;
+    handler: (response: RazorpayPaymentResponse) => void | Promise<void>;
+    modal?: { ondismiss?: () => void };
+    prefill?: { name?: string; contact?: string };
+    notes?: Record<string, string>;
+    theme?: { color: string };
+  }
+
+  interface RazorpayInstance {
+    open: () => void;
+    on: (event: 'payment.failed', callback: (response: { error?: { description?: string } }) => void) => void;
+  }
+
+  interface Window {
+    Razorpay?: new (options: RazorpayOptions) => RazorpayInstance;
+  }
+}
+
 const Checkout = () => {
-  const { cart, clearCart } = useCart();
+  const { cart } = useCart();
   const { user, isLoading } = useAuth();
   const [formData, setFormData] = useState({
     name: '', phone: '', address: '', city: '', state: '', zip: '',
@@ -40,10 +71,11 @@ const Checkout = () => {
     setIsSubmitting(true);
 
     try {
-      // Hand the order off to PhonePe. The Edge Function recomputes the total
-      // from DB prices, creates the order, and returns the hosted checkout URL.
+      // Create the Razorpay order server-side. The Edge Function recomputes the
+      // total from DB prices, creates the pending order, and returns the
+      // Razorpay key id + order id needed to open checkout.
       const fullAddress = `${formData.address}, ${formData.city}, ${formData.state} ${formData.zip}`;
-      const { data, error } = await supabase.functions.invoke('phonepe-pay', {
+      const { data, error } = await supabase.functions.invoke('razorpay-create-order', {
         body: {
           items: cart.map((item) => ({ product_id: item.id, quantity: item.quantity })),
           address: fullAddress,
@@ -52,15 +84,75 @@ const Checkout = () => {
       });
 
       if (error) throw error;
-      if (data?.error || !data?.redirectUrl) {
-        throw new Error(data?.error || 'Could not start PhonePe payment.');
+      if (data?.error || !data?.rzpOrderId) {
+        throw new Error(data?.error || 'Could not start Razorpay payment.');
+      }
+      if (!window.Razorpay) {
+        throw new Error('The Razorpay payment form could not load. Please check your connection and try again.');
       }
 
-      // Keep the cart until payment succeeds (cleared on the status page).
-      window.location.href = data.redirectUrl;
-    } catch (error: any) {
+      const dbOrderId = data.dbOrderId;
+      const rzp = new window.Razorpay({
+        key: data.keyId,
+        amount: data.amount,
+        currency: data.currency,
+        name: 'Katta Interiors',
+        description: 'Order payment',
+        order_id: data.rzpOrderId,
+        handler: async (response) => {
+          // Verify the payment signature server-side, then confirm.
+          try {
+            const { data: verification, error: verifyError } = await supabase.functions.invoke('razorpay-verify', {
+              body: {
+                order: dbOrderId,
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature,
+              },
+            });
+            if (verifyError) throw verifyError;
+            // With automatic capture enabled this is normally already
+            // confirmed. A short authorised-to-captured delay is handled by
+            // the status page and its signed webhook fallback.
+            if (verification?.pending) {
+              window.location.href = `/payment-status?order=${dbOrderId}`;
+              return;
+            }
+            if (!verification?.verified) {
+              throw new Error(verification?.error || 'Payment could not be verified.');
+            }
+            // Keep the cart until payment succeeds (cleared on the status page).
+            window.location.href = `/payment-status?order=${dbOrderId}`;
+          } catch (verifyError: unknown) {
+            console.error('Verification error:', verifyError);
+            const message = verifyError instanceof Error ? verifyError.message : 'Payment verification failed. Please contact support.';
+            toast.error(message);
+            setIsSubmitting(false);
+          }
+        },
+        modal: {
+          ondismiss: () => {
+            setIsSubmitting(false);
+          },
+        },
+        prefill: {
+          name: formData.name,
+          contact: formData.phone,
+        },
+        notes: {
+          address: fullAddress,
+        },
+        theme: { color: '#1f2937' },
+      });
+      rzp.on('payment.failed', (response) => {
+        toast.error(response.error?.description || 'Payment was not completed. Please try again.');
+        setIsSubmitting(false);
+      });
+      rzp.open();
+    } catch (error: unknown) {
       console.error('Checkout error:', error);
-      toast.error(error?.message || 'Failed to start payment. Please try again.');
+      const message = error instanceof Error ? error.message : 'Failed to start payment. Please try again.';
+      toast.error(message);
       setIsSubmitting(false);
     }
   };
@@ -166,18 +258,18 @@ const Checkout = () => {
               <h3 className="font-semibold text-gray-900 mb-4">Payment Method</h3>
               <Card className="border-primary/30 bg-primary/5">
                 <CardContent className="p-4 flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-full bg-[#5f259f] flex items-center justify-center flex-shrink-0">
-                    <Smartphone className="h-5 w-5 text-white" />
+                  <div className="h-10 w-10 rounded-full bg-[#1d4ed8] flex items-center justify-center flex-shrink-0">
+                    <CreditCard className="h-5 w-5 text-white" />
                   </div>
                   <div className="flex-1">
-                    <p className="font-medium text-gray-900">PhonePe</p>
+                    <p className="font-medium text-gray-900">Razorpay</p>
                     <p className="text-sm text-gray-500">Pay securely via UPI, cards, wallets &amp; net banking</p>
                   </div>
                 </CardContent>
               </Card>
               <p className="text-xs text-gray-400 mt-2 flex items-center gap-1">
                 <ShieldCheck className="h-3.5 w-3.5" />
-                You'll be redirected to PhonePe's secure checkout to complete payment.
+                A secure Razorpay payment window will open to complete payment.
               </p>
             </div>
 
