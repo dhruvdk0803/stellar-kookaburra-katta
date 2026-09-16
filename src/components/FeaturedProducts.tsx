@@ -63,7 +63,7 @@ const FeaturedProducts = () => {
   const togglePlay = () => setIsPlaying(!isPlaying);
 
   const handleAddToCart = (product: any) => {
-    const img = (product.images && product.images.length > 0) ? product.images[0] : (product.image_url || 'https://via.placeholder.com/400x400.png?text=No+Image');
+    const img = (product.images && product.images.length > 0) ? product.images[0] : (product.image_url || '/placeholder.svg');
     addToCart({ 
       id: product.id, 
       name: product.name, 
@@ -93,7 +93,7 @@ const FeaturedProducts = () => {
           <div className="overflow-hidden rounded-2xl" ref={emblaRef}>
             <div className="flex">
               {products.map((product) => {
-                const img = (product.images && product.images.length > 0) ? product.images[0] : (product.image_url || 'https://via.placeholder.com/400x400.png?text=No+Image');
+                const img = (product.images && product.images.length > 0) ? product.images[0] : (product.image_url || '/placeholder.svg');
                 return (
                   <div key={product.id} className="min-w-0 flex-[0_0_100%] md:flex-[0_0_50%] lg:flex-[0_0_33.333%] px-2">
                     <div className="bg-white rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 p-6 text-center h-full flex flex-col">

@@ -1,7 +1,9 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from './ui/button';
-import { ShoppingCart, Heart } from 'lucide-react';
+import { ShoppingCart, Heart, Share2, Check } from 'lucide-react';
 import { useCart } from '@/contexts/CartContext';
+import { shareProduct } from '@/lib/share';
 import { cn } from '@/lib/utils';
 
 interface ProductCardProps {
@@ -12,13 +14,15 @@ interface ProductCardProps {
 
 const ProductCard = ({ product, isInWishlist, onWishlistToggle }: ProductCardProps) => {
   const { cart, addToCart, updateQuantity, removeFromCart } = useCart();
+  const [shared, setShared] = useState(false);
 
   // Use the first image from the array, fallback to legacy image_url, then placeholder
   const imageUrl = (product.images && product.images.length > 0) 
     ? product.images[0] 
-    : (product.image_url || product.image || 'https://via.placeholder.com/400x400.png?text=No+Image');
+    : (product.image_url || product.image || '/placeholder.svg');
     
   const categoryName = product.categories?.name || product.subcategory || 'Uncategorized';
+  const brandName = product.brands?.name || product.brand?.name;
 
   // Check if product is already in cart
   const cartItem = cart.find(item => item.id === product.id);
@@ -50,12 +54,31 @@ const ProductCard = ({ product, isInWishlist, onWishlistToggle }: ProductCardPro
     onWishlistToggle(product.id);
   };
 
+  const handleShare = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const result = await shareProduct(product.name, `${window.location.origin}/product/${product.id}`);
+    if (result === 'copied') {
+      setShared(true);
+      setTimeout(() => setShared(false), 1500);
+    }
+  };
+
   return (
     <div className="group relative bg-white rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden border border-gray-100 flex flex-col h-full">
       <Link to={`/product/${product.id}`} className="block relative overflow-hidden">
-        <img src={imageUrl} alt={product.name} className="w-full h-56 sm:h-64 object-cover group-hover:scale-105 transition-transform duration-500" />
+        <img src={imageUrl} alt={product.name} loading="lazy" className="w-full h-56 sm:h-64 object-contain bg-gray-50 p-2 group-hover:scale-105 transition-transform duration-500" />
         <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors duration-300" />
       </Link>
+      <Button
+        size="icon"
+        variant="ghost"
+        onClick={handleShare}
+        aria-label="Share product"
+        className="absolute top-3 right-14 bg-white/80 backdrop-blur-sm hover:bg-white rounded-full h-9 w-9 z-10 shadow-sm"
+      >
+        {shared ? <Check className="h-5 w-5 text-green-600" /> : <Share2 className="h-5 w-5 text-gray-500" />}
+      </Button>
       <Button
         size="icon"
         variant="ghost"
@@ -66,6 +89,7 @@ const ProductCard = ({ product, isInWishlist, onWishlistToggle }: ProductCardPro
       </Button>
       <div className="p-4 flex flex-col flex-grow">
         <div className="flex-grow">
+          {brandName && <p className="mb-1 text-[11px] font-bold uppercase tracking-[0.16em] text-primary/65">{brandName}</p>}
           <h3 className="text-lg font-semibold text-gray-800 line-clamp-2 leading-tight mb-1">{product.name}</h3>
           <p className="text-sm text-gray-500">{categoryName}</p>
         </div>

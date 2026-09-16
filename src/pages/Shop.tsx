@@ -11,7 +11,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Filter, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { filterNonEmptyCategories } from '@/lib/categories';
-import { brandsIn, productBrand } from '@/lib/brands';
 
 // Fetch all active products with pagination. PostgREST caps any single
 // request at 1000 rows regardless of the requested limit, so the catalog
@@ -23,7 +22,7 @@ async function fetchAllProducts(): Promise<any[]> {
   for (;;) {
     const { data, error } = await supabase
       .from('products')
-      .select('*, categories(name, parent_id)')
+      .select('*, categories(name, slug, parent_id), brands(name, slug)')
       .eq('is_active', true)
       .range(from, from + PAGE - 1);
     if (error) throw error;
@@ -36,7 +35,7 @@ async function fetchAllProducts(): Promise<any[]> {
 }
 
 const Shop = () => {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const location = useLocation();
   const { isInWishlist, toggleWishlist } = useWishlist();
   
@@ -50,13 +49,14 @@ const Shop = () => {
   const [priceMax, setPriceMax] = useState(10000);
   // Brands present in the current category/search selection (before brand
   // filtering), so we only show brand chips when there is more than one.
-  const [availableBrands, setAvailableBrands] = useState<string[]>([]);
+  const [availableBrands, setAvailableBrands] = useState<{ name: string; slug: string }[]>([]);
 
   const [filters, setFilters] = useState(() => {
     const categoriesFromUrl = searchParams.getAll('category');
+    const brandsFromUrl = searchParams.getAll('brand');
     return {
       category: categoriesFromUrl.length > 0 ? categoriesFromUrl : [],
-      brand: [],
+      brand: brandsFromUrl,
       price: [0, 10000],
     };
   });
@@ -105,19 +105,16 @@ const Shop = () => {
     // 2. Category Filter (Case-insensitive and robust)
     if (filters.category && filters.category.length > 0) {
       const filterCats = filters.category.map((c: string) => c.toLowerCase().trim());
+      const categoriesById = new Map(categories.map((category) => [category.id, category]));
       
       newProducts = newProducts.filter(p => {
-        // Check direct category
-        const catName = p.categories?.name?.toLowerCase().trim();
-        if (catName && filterCats.includes(catName)) return true;
-        
-        // Check parent category
-        if (p.categories?.parent_id && categories.length > 0) {
-          const parentCat = categories.find(c => c.id === p.categories.parent_id);
-          if (parentCat && parentCat.name) {
-            const parentName = parentCat.name.toLowerCase().trim();
-            if (filterCats.includes(parentName)) return true;
-          }
+        let category = categoriesById.get(p.category_id) || p.categories;
+        let guard = 0;
+        while (category && guard++ < 20) {
+          const name = category.name?.toLowerCase().trim();
+          const slug = category.slug?.toLowerCase().trim();
+          if ((name && filterCats.includes(name)) || (slug && filterCats.includes(slug))) return true;
+          category = category.parent_id ? categoriesById.get(category.parent_id) : null;
         }
         
         return false;
@@ -127,13 +124,15 @@ const Shop = () => {
     // 3. Brand Filter — only meaningful when a material has >1 brand.
     // Brands offered are recomputed from the current category/search selection
     // so the chips always reflect what is actually visible.
-    setAvailableBrands(brandsIn(newProducts, categories));
+    const brandMap = new Map<string, { name: string; slug: string }>();
+    newProducts.forEach((product) => {
+      if (product.brands?.slug && product.brands?.name) brandMap.set(product.brands.slug, product.brands);
+    });
+    setAvailableBrands([...brandMap.values()].sort((a, b) => a.name.localeCompare(b.name)));
 
     if (filters.brand && filters.brand.length > 0) {
       const activeBrands = filters.brand.map((b: string) => b.toLowerCase().trim());
-      newProducts = newProducts.filter(p =>
-        activeBrands.includes(productBrand(p, categories).toLowerCase().trim())
-      );
+      newProducts = newProducts.filter(p => activeBrands.includes(p.brands?.slug?.toLowerCase().trim()));
     }
 
     // 4. Price Filter
@@ -156,28 +155,21 @@ const Shop = () => {
   // Sync URL params to state on initial load or URL change
   useEffect(() => {
     const categoriesFromUrl = searchParams.getAll('category');
-    if (categoriesFromUrl.length > 0) {
-      setFilters(prevFilters => {
-        // Only update if different to prevent unnecessary re-renders
-        if (JSON.stringify(prevFilters.category) !== JSON.stringify(categoriesFromUrl)) {
-          return { ...prevFilters, category: categoriesFromUrl };
-        }
-        return prevFilters;
-      });
-    }
+    const brandsFromUrl = searchParams.getAll('brand');
+    setFilters(prevFilters => {
+      if (JSON.stringify(prevFilters.category) === JSON.stringify(categoriesFromUrl) && JSON.stringify(prevFilters.brand) === JSON.stringify(brandsFromUrl)) return prevFilters;
+      return { ...prevFilters, category: categoriesFromUrl, brand: brandsFromUrl };
+    });
   }, [searchParams]);
 
   const handleFilterChange = (newFilters: any) => {
     setFilters(newFilters);
-  };
-
-  const toggleBrand = (brand: string) => {
-    setFilters(prev => ({
-      ...prev,
-      brand: prev.brand.includes(brand)
-        ? prev.brand.filter((b: string) => b !== brand)
-        : [...prev.brand, brand],
-    }));
+    const next = new URLSearchParams();
+    newFilters.category.forEach((category: string) => next.append('category', category));
+    newFilters.brand.forEach((brand: string) => next.append('brand', brand));
+    const search = searchParams.get('search');
+    if (search) next.set('search', search);
+    setSearchParams(next, { replace: true });
   };
 
   // Only offer categories that actually contain products. The full `categories`

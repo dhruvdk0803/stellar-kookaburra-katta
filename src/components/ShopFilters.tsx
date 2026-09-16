@@ -7,7 +7,7 @@ interface ShopFiltersProps {
   onFilterChange: (filters: any) => void;
   filters: any;
   priceMax: number;
-  availableBrands?: string[];
+  availableBrands?: { name: string; slug: string }[];
 }
 
 const ShopFilters = ({ categories, onFilterChange, filters, priceMax, availableBrands = [] }: ShopFiltersProps) => {
@@ -84,15 +84,15 @@ const ShopFilters = ({ categories, onFilterChange, filters, priceMax, availableB
           <div className="flex flex-wrap gap-2">
             {availableBrands.map(brand => (
               <button
-                key={brand}
-                onClick={() => handleBrandChange(brand)}
+                key={brand.slug}
+                onClick={() => handleBrandChange(brand.slug)}
                 className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${
-                  (filters.brand || []).includes(brand)
+                  (filters.brand || []).includes(brand.slug)
                     ? 'bg-primary text-primary-foreground border-primary'
                     : 'bg-white text-gray-700 border-gray-200 hover:border-primary/50'
                 }`}
               >
-                {brand}
+                {brand.name}
               </button>
             ))}
           </div>

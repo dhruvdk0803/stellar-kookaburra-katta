@@ -22,7 +22,7 @@ const Wishlist = () => {
       }
       const { data } = await supabase
         .from('products')
-        .select('*, categories(name)')
+        .select('*, categories(name, slug), brands(name, slug)')
         .in('id', wishlist);
       setProducts(data || []);
       setLoading(false);

@@ -34,9 +34,11 @@ export function rootCategoryName(
  * the first word of the product name is the brand (owner rule).
  */
 export function productBrand(
-  product: { name?: string | null; category_id?: string | null },
+  product: { name?: string | null; category_id?: string | null; brands?: { name?: string | null } | null; brand?: { name?: string | null } | null },
   categories: CategoryNode[],
 ): string {
+  const structuredBrand = product.brands?.name || product.brand?.name;
+  if (structuredBrand) return structuredBrand;
   const root = rootCategoryName(product.category_id, categories);
   if (root && BRAND_CATEGORIES.has(root)) return root;
   const first = (product.name || '').trim().split(/\s+/)[0];

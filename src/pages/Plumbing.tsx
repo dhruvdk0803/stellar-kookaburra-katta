@@ -59,7 +59,7 @@ const Plumbing = () => {
       if (categoryIds.length > 0) {
         const { data: prods } = await supabase
           .from('products')
-          .select('*, categories(name, parent_id)')
+          .select('*, categories(name, slug, parent_id), brands(name, slug)')
           .in('category_id', categoryIds)
           .eq('is_active', true)
           .order('price', { ascending: true });

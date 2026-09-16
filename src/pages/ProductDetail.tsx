@@ -3,7 +3,8 @@ import { useParams, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
-import { ShoppingCart, Heart, MessageCircle, Loader2, Star, ShieldCheck } from 'lucide-react';
+import { ShoppingCart, Heart, MessageCircle, Loader2, Star, ShieldCheck, Share2 } from 'lucide-react';
+import { shareProduct } from '@/lib/share';
 import Navigation from '@/components/Navigation';
 import Footer from '@/components/Footer';
 import ProductCard from '@/components/ProductCard';
@@ -41,7 +42,7 @@ const ProductDetail = () => {
       // Fetch Product
       const { data: prodData } = await supabase
         .from('products')
-        .select('*, categories(name)')
+        .select('*, categories(name, slug), brands(name, slug)')
         .eq('id', id)
         .single();
       
@@ -51,13 +52,13 @@ const ProductDetail = () => {
         const vars = Array.isArray(prodData.variants) ? prodData.variants : [];
         const defIdx = vars.findIndex((v: any) => v.is_default);
         setSelectedVariant(defIdx >= 0 ? defIdx : 0);
-        const imgs = (prodData.images && prodData.images.length > 0) ? prodData.images : (prodData.image_url ? [prodData.image_url] : ['https://via.placeholder.com/800x800.png?text=No+Image']);
+        const imgs = (prodData.images && prodData.images.length > 0) ? prodData.images : (prodData.image_url ? [prodData.image_url] : ['/placeholder.svg']);
         setSelectedImage(imgs[0]);
         
         if (prodData.category_id) {
           const { data: related } = await supabase
             .from('products')
-            .select('*, categories(name)')
+            .select('*, categories(name, slug), brands(name, slug)')
             .eq('category_id', prodData.category_id)
             .neq('id', prodData.id)
             .eq('is_active', true)
@@ -140,7 +141,7 @@ const ProductDetail = () => {
     );
   }
 
-  const allImages = (product.images && product.images.length > 0) ? product.images : (product.image_url ? [product.image_url] : ['https://via.placeholder.com/800x800.png?text=No+Image']);
+  const allImages = (product.images && product.images.length > 0) ? product.images : (product.image_url ? [product.image_url] : ['/placeholder.svg']);
   const categoryName = product.categories?.name || product.subcategory || 'Uncategorized';
   
   const specs = product.specs || {
@@ -210,16 +211,27 @@ const ProductDetail = () => {
           </div>
 
           <div>
+            {product.brands?.name && <p className="mb-2 text-xs font-bold uppercase tracking-[0.18em] text-primary/65">{product.brands.name}</p>}
             <div className="flex justify-between items-start mb-2">
               <h1 className="text-2xl md:text-3xl font-playfair font-bold text-gray-900 pr-4">{product.name}</h1>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => toggleWishlist(product.id)}
-                className="rounded-full border-2 border-gray-200 hover:border-primary/50 flex-shrink-0"
-              >
-                <Heart className={cn('h-5 w-5 md:h-6 md:w-6', isInWishlist(product.id) ? 'text-red-500 fill-red-500' : 'text-gray-400')} />
-              </Button>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <Button
+                  variant="outline"
+                  onClick={() => shareProduct(product.name, `${window.location.origin}/product/${product.id}`)}
+                  className="rounded-full"
+                >
+                  <Share2 className="h-4 w-4 mr-2" />
+                  Share
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => toggleWishlist(product.id)}
+                  className="rounded-full border-2 border-gray-200 hover:border-primary/50"
+                >
+                  <Heart className={cn('h-5 w-5 md:h-6 md:w-6', isInWishlist(product.id) ? 'text-red-500 fill-red-500' : 'text-gray-400')} />
+                </Button>
+              </div>
             </div>
             
             {/* Rating Summary */}

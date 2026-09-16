@@ -14,20 +14,32 @@ import { Auth } from '@supabase/auth-ui-react';
 import { ThemeSupa } from '@supabase/auth-ui-shared';
 import { Loader2, LogOut, Package, Tags, ShoppingBag, Edit2, X, DollarSign, Activity, LayoutDashboard, ChevronDown, ChevronUp, Upload, Image as ImageIcon, FileSpreadsheet, Wrench } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
+import { ensureBrandPrefix, stripKnownBrandPrefix } from '@/lib/catalog';
 
 const Admin = () => {
   const { user, profile, isLoading, signOut } = useAuth();
   const navigate = useNavigate();
   
   const [categories, setCategories] = useState<any[]>([]);
+  const [brands, setBrands] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
   const [orders, setOrders] = useState<any[]>([]);
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
 
   // Category Form States
+  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
   const [catName, setCatName] = useState('');
   const [catSlug, setCatSlug] = useState('');
   const [catParentId, setCatParentId] = useState('');
+  const [catImage, setCatImage] = useState('');
+  const [catOrder, setCatOrder] = useState('0');
+
+  // Brand Form States
+  const [editingBrandId, setEditingBrandId] = useState<string | null>(null);
+  const [brandName, setBrandName] = useState('');
+  const [brandSlug, setBrandSlug] = useState('');
+  const [brandLogo, setBrandLogo] = useState('');
+  const [brandOrder, setBrandOrder] = useState('0');
   
   // Product Form States
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
@@ -35,6 +47,7 @@ const Admin = () => {
   const [prodPrice, setProdPrice] = useState('');
   const [prodDesc, setProdDesc] = useState('');
   const [prodCat, setProdCat] = useState('');
+  const [prodBrand, setProdBrand] = useState('');
   const [prodStock, setProdStock] = useState('100');
   const [prodImages, setProdImages] = useState<string[]>([]);
   const [isUploadingImages, setIsUploadingImages] = useState(false);
@@ -48,12 +61,14 @@ const Admin = () => {
   }, [profile]);
 
   const fetchData = async () => {
-    const [catRes, prodRes, ordRes] = await Promise.all([
+    const [catRes, brandRes, prodRes, ordRes] = await Promise.all([
       supabase.from('categories').select('*, parent:parent_id(name)').order('created_at', { ascending: false }),
-      supabase.from('products').select('*, categories(name)').order('created_at', { ascending: false }),
+      supabase.from('brands').select('*').order('display_order').order('name'),
+      supabase.from('products').select('*, categories(name), brands(name, slug)').order('created_at', { ascending: false }),
       supabase.from('orders').select('*, profiles(name), order_items(*, products(name, image_url, images))').order('created_at', { ascending: false })
     ]);
     if (catRes.data) setCategories(catRes.data);
+    if (brandRes.data) setBrands(brandRes.data);
     if (prodRes.data) setProducts(prodRes.data);
     if (ordRes.data) setOrders(ordRes.data);
   };
@@ -82,12 +97,19 @@ const Admin = () => {
   // --- Category Actions ---
   const handleAddCategory = async (e: React.FormEvent) => {
     e.preventDefault();
-    const newCat: any = { name: catName, slug: catSlug };
-    if (catParentId) newCat.parent_id = catParentId;
+    const newCat: any = { name: catName, slug: catSlug, image_url: catImage || null, display_order: parseInt(catOrder) || 0 };
+    newCat.parent_id = catParentId || null;
 
-    const { error } = await supabase.from('categories').insert([newCat]);
+    const query = editingCategoryId
+      ? supabase.from('categories').update(newCat).eq('id', editingCategoryId)
+      : supabase.from('categories').insert([newCat]);
+    const { error } = await query;
     if (error) toast.error(error.message);
-    else { toast.success('Category added!'); setCatName(''); setCatSlug(''); setCatParentId(''); fetchData(); }
+    else { toast.success(editingCategoryId ? 'Category updated!' : 'Category added!'); setEditingCategoryId(null); setCatName(''); setCatSlug(''); setCatParentId(''); setCatImage(''); setCatOrder('0'); fetchData(); }
+  };
+
+  const handleEditCategory = (category: any) => {
+    setEditingCategoryId(category.id); setCatName(category.name); setCatSlug(category.slug); setCatParentId(category.parent_id || ''); setCatImage(category.image_url || ''); setCatOrder(String(category.display_order || 0));
   };
 
   const handleDeleteCategory = async (id: string) => {
@@ -97,9 +119,28 @@ const Admin = () => {
     else { toast.success('Category deleted'); fetchData(); }
   };
 
+  const resetBrandForm = () => {
+    setEditingBrandId(null); setBrandName(''); setBrandSlug(''); setBrandLogo(''); setBrandOrder('0');
+  };
+
+  const handleSaveBrand = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const values = { name: brandName.trim(), slug: brandSlug.trim().toLowerCase(), logo_url: brandLogo.trim() || null, display_order: parseInt(brandOrder) || 0, is_active: true };
+    const query = editingBrandId
+      ? supabase.from('brands').update(values).eq('id', editingBrandId)
+      : supabase.from('brands').insert([values]);
+    const { error } = await query;
+    if (error) toast.error(error.message);
+    else { toast.success(editingBrandId ? 'Brand updated!' : 'Brand added!'); resetBrandForm(); fetchData(); }
+  };
+
+  const handleEditBrand = (brand: any) => {
+    setEditingBrandId(brand.id); setBrandName(brand.name); setBrandSlug(brand.slug); setBrandLogo(brand.logo_url || ''); setBrandOrder(String(brand.display_order || 0));
+  };
+
   // --- Product Actions ---
   const resetProductForm = () => {
-    setProdName(''); setProdPrice(''); setProdDesc(''); setProdCat(''); setProdStock('100'); setProdImages([]);
+    setProdName(''); setProdPrice(''); setProdDesc(''); setProdCat(''); setProdBrand(''); setProdStock('100'); setProdImages([]);
     setEditingProductId(null);
   };
 
@@ -144,8 +185,11 @@ const Admin = () => {
 
   const handleSaveProduct = async (e: React.FormEvent) => {
     e.preventDefault();
+    const selectedBrand = brands.find((brand) => brand.id === prodBrand);
+    if (!selectedBrand) { toast.error('Select a valid brand.'); return; }
     const productData = {
-      name: prodName, 
+      name: ensureBrandPrefix(stripKnownBrandPrefix(prodName, brands), selectedBrand.name),
+      brand_id: selectedBrand.id,
       price: parseFloat(prodPrice), 
       description: prodDesc,
       category_id: prodCat, 
@@ -167,10 +211,11 @@ const Admin = () => {
 
   const handleEditClick = (product: any) => {
     setEditingProductId(product.id);
-    setProdName(product.name);
+    setProdName(stripKnownBrandPrefix(product.name, brands));
     setProdPrice(product.price.toString());
     setProdDesc(product.description || '');
     setProdCat(product.category_id || '');
+    setProdBrand(product.brand_id || '');
     setProdStock(product.stock?.toString() || '0');
     
     let imgs = product.images || [];
@@ -197,6 +242,7 @@ const Admin = () => {
       const text = await file.text();
       const lines = text.split('\n');
       const headers = lines[0].toLowerCase().split(',').map(h => h.trim());
+      if (!headers.includes('brand') && !headers.includes('brand_slug')) throw new Error('CSV must include a brand or brand_slug column.');
       
       const productsToInsert = [];
       
@@ -217,6 +263,14 @@ const Admin = () => {
           }
         });
         
+        const requestedBrand = (product.brand_slug || product.brand || '').toLowerCase();
+        const matchedBrand = brands.find((brand) => brand.slug.toLowerCase() === requestedBrand || brand.name.toLowerCase() === requestedBrand);
+        if (!matchedBrand) throw new Error(`Row ${i + 1}: unknown brand "${product.brand_slug || product.brand || ''}".`);
+        if (!product.name || !product.category_id) throw new Error(`Row ${i + 1}: name and category_id are required.`);
+        product.brand_id = matchedBrand.id;
+        product.name = ensureBrandPrefix(stripKnownBrandPrefix(product.name, brands), matchedBrand.name);
+        delete product.brand;
+        delete product.brand_slug;
         product.is_active = true;
         productsToInsert.push(product);
       }
@@ -320,11 +374,12 @@ const Admin = () => {
         </div>
         
         <Tabs defaultValue="overview" className="w-full">
-          <TabsList className="grid w-full grid-cols-4 mb-8 bg-white p-1 rounded-xl shadow-sm border border-gray-100">
+          <TabsList className="grid w-full grid-cols-5 mb-8 bg-white p-1 rounded-xl shadow-sm border border-gray-100">
             <TabsTrigger value="overview" className="rounded-lg py-3"><LayoutDashboard className="w-4 h-4 mr-2 hidden sm:block" /> Overview</TabsTrigger>
             <TabsTrigger value="orders" className="rounded-lg py-3"><ShoppingBag className="w-4 h-4 mr-2 hidden sm:block" /> Orders</TabsTrigger>
             <TabsTrigger value="products" className="rounded-lg py-3"><Package className="w-4 h-4 mr-2 hidden sm:block" /> Products</TabsTrigger>
             <TabsTrigger value="categories" className="rounded-lg py-3"><Tags className="w-4 h-4 mr-2 hidden sm:block" /> Categories</TabsTrigger>
+            <TabsTrigger value="brands" className="rounded-lg py-3"><Tags className="w-4 h-4 mr-2 hidden sm:block" /> Brands</TabsTrigger>
           </TabsList>
 
           {/* OVERVIEW TAB */}
@@ -439,7 +494,7 @@ const Admin = () => {
                                 <h4 className="font-semibold text-gray-900 mb-4">Order Items</h4>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                   {order.order_items?.map((item: any) => {
-                                    const img = (item.products?.images && item.products.images.length > 0) ? item.products.images[0] : (item.products?.image_url || 'https://via.placeholder.com/100');
+                                    const img = (item.products?.images && item.products.images.length > 0) ? item.products.images[0] : (item.products?.image_url || '/placeholder.svg');
                                     return (
                                       <div key={item.id} className="flex items-center space-x-4 bg-white p-3 rounded-lg border border-gray-100 shadow-sm">
                                         <img src={img} alt={item.products?.name} className="w-16 h-16 rounded-md object-cover border border-gray-100" />
@@ -480,7 +535,17 @@ const Admin = () => {
                   </CardHeader>
                   <CardContent>
                     <form onSubmit={handleSaveProduct} className="space-y-4">
-                      <Input placeholder="Product Name" value={prodName} onChange={(e) => setProdName(e.target.value)} required />
+                      <Input placeholder="Product name without brand" value={prodName} onChange={(e) => setProdName(e.target.value)} required />
+                      <select
+                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                        value={prodBrand} onChange={(e) => setProdBrand(e.target.value)} required
+                      >
+                        <option value="">Select Brand</option>
+                        {brands.map(brand => <option key={brand.id} value={brand.id}>{brand.name}</option>)}
+                      </select>
+                      {prodBrand && prodName.trim() && (
+                        <p className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-gray-600">Customer-facing name: <strong>{ensureBrandPrefix(stripKnownBrandPrefix(prodName, brands), brands.find(brand => brand.id === prodBrand)?.name || '')}</strong></p>
+                      )}
                       <div className="grid grid-cols-2 gap-4">
                         <Input type="number" placeholder="Price (₹)" value={prodPrice} onChange={(e) => setProdPrice(e.target.value)} required />
                         <Input type="number" placeholder="Stock" value={prodStock} onChange={(e) => setProdStock(e.target.value)} required />
@@ -542,7 +607,7 @@ const Admin = () => {
                   <CardHeader><CardTitle className="flex items-center"><FileSpreadsheet className="w-5 h-5 mr-2" /> Bulk Upload (CSV)</CardTitle></CardHeader>
                   <CardContent>
                     <p className="text-xs text-gray-500 mb-4">
-                      Format: <code className="bg-gray-100 px-1 rounded">name, price, description, category_id, stock, images</code><br/>
+                      Format: <code className="bg-gray-100 px-1 rounded">name, brand_slug, price, description, category_id, stock, images</code><br/>
                       (Separate multiple image URLs with a semicolon <code className="bg-gray-100 px-1 rounded">;</code>)
                     </p>
                     <label className="flex items-center justify-center w-full h-24 border-2 border-dashed border-gray-300 rounded-xl hover:bg-gray-50 cursor-pointer transition-colors">
@@ -584,6 +649,7 @@ const Admin = () => {
                         <tr>
                           <th className="px-4 py-3">Product</th>
                           <th className="px-4 py-3">Category</th>
+                          <th className="px-4 py-3">Brand</th>
                           <th className="px-4 py-3">Price</th>
                           <th className="px-4 py-3">Stock</th>
                           <th className="px-4 py-3 text-right">Actions</th>
@@ -591,7 +657,7 @@ const Admin = () => {
                       </thead>
                       <tbody className="divide-y divide-gray-100">
                         {products.map(product => {
-                          const img = (product.images && product.images.length > 0) ? product.images[0] : (product.image_url || 'https://via.placeholder.com/40');
+                          const img = (product.images && product.images.length > 0) ? product.images[0] : (product.image_url || '/placeholder.svg');
                           return (
                             <tr key={product.id} className="hover:bg-gray-50/50 transition-colors">
                               <td className="px-4 py-3 font-medium text-gray-900">
@@ -601,6 +667,7 @@ const Admin = () => {
                                 </div>
                               </td>
                               <td className="px-4 py-3 text-gray-600">{product.categories?.name || 'N/A'}</td>
+                              <td className="px-4 py-3 text-gray-600">{product.brands?.name || 'N/A'}</td>
                               <td className="px-4 py-3 font-medium">₹{product.price}</td>
                               <td className="px-4 py-3">{product.stock}</td>
                               <td className="px-4 py-3 text-right space-x-2">
@@ -626,11 +693,16 @@ const Admin = () => {
           <TabsContent value="categories">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
               <Card className="lg:col-span-1 border-0 shadow-sm h-fit">
-                <CardHeader><CardTitle>Add Category</CardTitle></CardHeader>
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <CardTitle>{editingCategoryId ? 'Edit Category' : 'Add Category'}</CardTitle>
+                  {editingCategoryId && <Button variant="ghost" size="icon" onClick={() => { setEditingCategoryId(null); setCatName(''); setCatSlug(''); setCatParentId(''); setCatImage(''); setCatOrder('0'); }}><X className="h-4 w-4" /></Button>}
+                </CardHeader>
                 <CardContent>
                   <form onSubmit={handleAddCategory} className="space-y-4">
                     <Input placeholder="Name (e.g. Sunmica)" value={catName} onChange={(e) => setCatName(e.target.value)} required />
                     <Input placeholder="Slug (e.g. sunmica)" value={catSlug} onChange={(e) => setCatSlug(e.target.value)} required />
+                    <Input placeholder="Category image URL (optional)" value={catImage} onChange={(e) => setCatImage(e.target.value)} />
+                    <Input type="number" placeholder="Display order" value={catOrder} onChange={(e) => setCatOrder(e.target.value)} />
                     <select 
                       className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                       value={catParentId} onChange={(e) => setCatParentId(e.target.value)}
@@ -640,7 +712,7 @@ const Admin = () => {
                         <option key={c.id} value={c.id}>{c.name}</option>
                       ))}
                     </select>
-                    <Button type="submit" className="w-full rounded-full">Add Category</Button>
+                    <Button type="submit" className="w-full rounded-full">{editingCategoryId ? 'Update Category' : 'Add Category'}</Button>
                   </form>
                 </CardContent>
               </Card>
@@ -655,6 +727,7 @@ const Admin = () => {
                           <th className="px-4 py-3">Name</th>
                           <th className="px-4 py-3">Parent</th>
                           <th className="px-4 py-3">Slug</th>
+                          <th className="px-4 py-3">Order</th>
                           <th className="px-4 py-3 text-right">Action</th>
                         </tr>
                       </thead>
@@ -664,7 +737,9 @@ const Admin = () => {
                             <td className="px-4 py-3 font-medium text-gray-900">{cat.name}</td>
                             <td className="px-4 py-3 text-gray-500">{cat.parent?.name || '-'}</td>
                             <td className="px-4 py-3 text-gray-500">{cat.slug}</td>
-                            <td className="px-4 py-3 text-right">
+                            <td className="px-4 py-3 text-gray-500">{cat.display_order || 0}</td>
+                            <td className="px-4 py-3 text-right space-x-2">
+                              <Button variant="outline" size="sm" onClick={() => handleEditCategory(cat)} className="rounded-full text-xs h-8">Edit</Button>
                               <Button variant="outline" size="sm" onClick={() => handleDeleteCategory(cat.id)} className="rounded-full text-xs h-8 text-red-600 hover:bg-red-50 border-red-100">Delete</Button>
                             </td>
                           </tr>
@@ -672,6 +747,41 @@ const Admin = () => {
                       </tbody>
                     </table>
                   </div>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
+          {/* BRANDS TAB */}
+          <TabsContent value="brands">
+            <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
+              <Card className="h-fit border-0 shadow-sm">
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <CardTitle>{editingBrandId ? 'Edit Brand' : 'Add Brand'}</CardTitle>
+                  {editingBrandId && <Button variant="ghost" size="icon" onClick={resetBrandForm}><X className="h-4 w-4" /></Button>}
+                </CardHeader>
+                <CardContent>
+                  <form onSubmit={handleSaveBrand} className="space-y-4">
+                    <Input placeholder="Brand name" value={brandName} onChange={(e) => setBrandName(e.target.value)} required />
+                    <Input placeholder="Brand slug" value={brandSlug} onChange={(e) => setBrandSlug(e.target.value)} required />
+                    <Input placeholder="Logo URL" value={brandLogo} onChange={(e) => setBrandLogo(e.target.value)} />
+                    <Input type="number" placeholder="Display order" value={brandOrder} onChange={(e) => setBrandOrder(e.target.value)} />
+                    <Button type="submit" className="w-full rounded-full">{editingBrandId ? 'Update Brand' : 'Add Brand'}</Button>
+                  </form>
+                </CardContent>
+              </Card>
+              <Card className="border-0 shadow-sm lg:col-span-2">
+                <CardHeader><CardTitle>Brand List ({brands.length})</CardTitle></CardHeader>
+                <CardContent className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  {brands.map(brand => (
+                    <div key={brand.id} className="flex items-center gap-4 rounded-xl border border-gray-100 p-3">
+                      <div className="flex h-14 w-24 items-center justify-center rounded-lg bg-gray-50 p-2">
+                        {brand.logo_url ? <img src={brand.logo_url} alt="" className="h-full w-full object-contain" /> : <span className="font-bold">{brand.name}</span>}
+                      </div>
+                      <div className="min-w-0 flex-1"><p className="font-semibold">{brand.name}</p><p className="text-xs text-gray-500">/{brand.slug} · order {brand.display_order || 0}</p></div>
+                      <Button variant="outline" size="icon" onClick={() => handleEditBrand(brand)}><Edit2 className="h-4 w-4" /></Button>
+                    </div>
+                  ))}
                 </CardContent>
               </Card>
             </div>

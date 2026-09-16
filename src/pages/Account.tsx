@@ -188,7 +188,7 @@ const Account = () => {
                           <div key={item.id} className="py-3 flex items-center justify-between">
                             <div className="flex items-center space-x-4">
                               <img 
-                                src={item.products?.image_url || 'https://via.placeholder.com/100'} 
+                                src={item.products?.image_url || '/placeholder.svg'} 
                                 alt={item.products?.name} 
                                 className="w-12 h-12 rounded-md object-cover border border-gray-100"
                               />

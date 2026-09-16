@@ -27,7 +27,7 @@ const Navigation = () => {
   const [showDropdown, setShowDropdown] = useState(false);
   
   // Dynamic Categories State
-  const [shopCategories, setShopCategories] = useState<{ [key: string]: any[] }>({});
+  const [shopCategories, setShopCategories] = useState<{ [key: string]: { root: any; children: any[] } }>({});
   const [loadingCategories, setLoadingCategories] = useState(true);
   
   const searchRef = useRef<HTMLDivElement>(null);
@@ -40,26 +40,52 @@ const Navigation = () => {
   // Fetch Categories from Database
   useEffect(() => {
     const fetchCategories = async () => {
-      const [catRes, prodRes] = await Promise.all([
-        supabase.from('categories').select('*').order('name'),
-        supabase.from('products').select('category_id').eq('is_active', true),
-      ]);
+      const cardRes = await supabase
+        .from('homepage_category_cards')
+        .select('id, name, slug, parent_id, root_id, display_order')
+        .order('display_order')
+        .order('name');
 
-      if (!catRes.error && catRes.data) {
-        // Hide categories with no products behind them so the menu never leads
-        // to an empty listing.
-        const stocked = filterNonEmptyCategories(
-          catRes.data,
-          (prodRes.data || []).map((p) => p.category_id),
-        );
-        const mainCats = stocked.filter(c => !c.parent_id);
-        const grouped: { [key: string]: any[] } = {};
+      if (!cardRes.error && cardRes.data) {
+        const stocked = cardRes.data;
+        const mainCats = stocked.filter(c => c.id === c.root_id);
+        const grouped: { [key: string]: { root: any; children: any[] } } = {};
         
         mainCats.forEach(mc => {
-          grouped[mc.name] = stocked.filter(c => c.parent_id === mc.id);
+          grouped[mc.name] = {
+            root: mc,
+            children: stocked.filter(c => c.root_id === mc.id && c.id !== mc.id),
+          };
         });
         
         setShopCategories(grouped);
+      } else {
+        const catRes = await supabase.from('categories').select('*').order('name');
+        const productCategoryIds: string[] = [];
+        for (let from = 0; ; from += 1000) {
+          const page = await supabase.from('products').select('category_id').eq('is_active', true).range(from, from + 999);
+          if (page.error || !page.data) break;
+          productCategoryIds.push(...page.data.map((product) => product.category_id));
+          if (page.data.length < 1000) break;
+        }
+        if (!catRes.error && catRes.data) {
+          const stocked = filterNonEmptyCategories(catRes.data, productCategoryIds);
+          const mainCats = stocked.filter((category) => !category.parent_id);
+          const grouped: { [key: string]: { root: any; children: any[] } } = {};
+          mainCats.forEach((root) => {
+            const descendants = stocked.filter((category) => {
+              let current = category;
+              let guard = 0;
+              while (current?.parent_id && guard++ < 20) {
+                if (current.parent_id === root.id) return true;
+                current = stocked.find((candidate) => candidate.id === current.parent_id);
+              }
+              return false;
+            });
+            grouped[root.name] = { root, children: descendants };
+          });
+          setShopCategories(grouped);
+        }
       }
       setLoadingCategories(false);
     };
@@ -124,7 +150,7 @@ const Navigation = () => {
   const getProductImage = (product: any) => {
     if (product.images && product.images.length > 0) return product.images[0];
     if (product.image_url) return product.image_url;
-    return 'https://via.placeholder.com/40';
+    return '/placeholder.svg';
   };
 
   return (
@@ -162,31 +188,33 @@ const Navigation = () => {
                   <span>Shop</span>
                   <ChevronDown className="h-4 w-4 transition-transform duration-200" />
                 </DropdownMenuTrigger>
-                <DropdownMenuContent className="w-56 bg-white border border-gray-200 rounded-xl shadow-lg max-h-[80vh] overflow-y-auto">
+                <DropdownMenuContent align="center" className="w-[min(900px,calc(100vw-2rem))] bg-white border border-gray-200 rounded-2xl shadow-xl max-h-[80vh] overflow-y-auto p-3">
                   {loadingCategories ? (
                     <div className="p-4 flex justify-center"><Loader2 className="h-5 w-5 animate-spin text-primary" /></div>
                   ) : Object.keys(shopCategories).length === 0 ? (
                     <div className="p-4 text-sm text-gray-500 text-center">No categories found</div>
                   ) : (
-                    Object.entries(shopCategories).map(([categoryName, subcategories]) => (
-                      <div key={categoryName} className="p-2">
+                    <div className="grid grid-cols-2 gap-2 lg:grid-cols-3">
+                    {Object.entries(shopCategories).map(([categoryName, group]) => (
+                      <div key={categoryName} className="rounded-xl p-3 hover:bg-gray-50">
                         <div 
-                          className="font-semibold text-gray-900 px-2 py-1 text-sm border-b border-gray-100 mb-2 cursor-pointer hover:text-primary"
-                          onClick={() => navigate(`/shop?category=${categoryName}`)}
+                          className="font-semibold text-gray-900 px-2 py-2 text-sm border-b border-gray-100 mb-2 cursor-pointer hover:text-primary"
+                          onClick={() => navigate(`/shop?category=${encodeURIComponent(group.root.slug || categoryName)}`)}
                         >
                           {categoryName}
                         </div>
-                        {subcategories.map((sub) => (
+                        {group.children.map((sub) => (
                           <DropdownMenuItem 
                             key={sub.id} 
-                            onClick={() => navigate(`/shop?category=${sub.name}`)}
+                            onClick={() => navigate(`/shop?category=${encodeURIComponent(sub.slug || sub.name)}`)}
                             className="cursor-pointer hover:bg-primary/5 rounded-md px-3 py-2 text-sm text-gray-600"
                           >
                             {sub.name}
                           </DropdownMenuItem>
                         ))}
                       </div>
-                    ))
+                    ))}
+                    </div>
                   )}
                   <div className="p-2 border-t border-gray-100 mt-2">
                     <DropdownMenuItem 
@@ -207,14 +235,14 @@ const Navigation = () => {
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
                   <Input
                     type="text"
-                    placeholder="Search..."
+                    placeholder="Search products or brands..."
                     value={searchQuery}
                     onChange={(e) => {
                       setSearchQuery(e.target.value);
                       setShowDropdown(true);
                     }}
                     onFocus={() => setShowDropdown(true)}
-                    className="pl-10 w-48 lg:w-64 h-10 border-gray-200 focus:border-primary focus:ring-1 focus:ring-primary/20 rounded-full transition-all duration-200 bg-white/80"
+                    className="pl-10 w-64 2xl:w-80 h-10 border-gray-200 focus:border-primary focus:ring-1 focus:ring-primary/20 rounded-full transition-all duration-200 bg-white/80"
                   />
                 </form>
                 
@@ -373,23 +401,23 @@ const Navigation = () => {
                           ) : Object.keys(shopCategories).length === 0 ? (
                             <div className="p-4 text-sm text-gray-500">No categories found</div>
                           ) : (
-                            Object.entries(shopCategories).map(([categoryName, subcategories]) => (
+                            Object.entries(shopCategories).map(([categoryName, group]) => (
                               <div key={categoryName}>
                                 <div 
                                   className="font-semibold text-gray-900 px-3 py-2 text-base border-b border-gray-200 mb-1 cursor-pointer"
                                   onClick={() => {
-                                    navigate(`/shop?category=${categoryName}`);
+                                    navigate(`/shop?category=${encodeURIComponent(group.root.slug || categoryName)}`);
                                     setIsMobileMenuOpen(false);
                                   }}
                                 >
                                   {categoryName}
                                 </div>
                                 <div className="flex flex-col space-y-1">
-                                  {subcategories.map((sub) => (
+                                  {group.children.map((sub) => (
                                     <button
                                       key={sub.id} 
                                       onClick={() => {
-                                        navigate(`/shop?category=${sub.name}`);
+                                        navigate(`/shop?category=${encodeURIComponent(sub.slug || sub.name)}`);
                                         setIsMobileMenuOpen(false);
                                       }}
                                       className="text-left text-gray-600 hover:text-primary hover:bg-primary/5 px-3 py-2 rounded-md text-sm transition-colors"
