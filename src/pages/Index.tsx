@@ -1,7 +1,6 @@
-import React from 'react';
 import Navigation from '@/components/Navigation';
 import Hero from '@/components/Hero';
-import MaterialSections from '@/components/MaterialSections';
+import HomeCatalog from '@/components/HomeCatalog';
 import WhyChooseKatta from '@/components/WhyChooseKatta';
 import InspirationGallery from '@/components/InspirationGallery';
 import Footer from '@/components/Footer';
@@ -11,7 +10,7 @@ const Index = () => {
     <div className="min-h-screen bg-white font-poppins">
       <Navigation />
       <Hero />
-      <MaterialSections />
+      <HomeCatalog />
       <WhyChooseKatta />
       <InspirationGallery />
       <Footer />
