@@ -46,16 +46,21 @@ Deno.serve(async (req) => {
     if (!requestBody || typeof requestBody !== "object") {
       return json({ error: "Invalid checkout request" }, 400);
     }
-    const { items, address, phone } = requestBody as {
+    const { items, address, phone, discount_percent } = requestBody as {
       items?: unknown;
       address?: unknown;
       phone?: unknown;
+      discount_percent?: unknown;
     };
     if (!Array.isArray(items) || items.length === 0) {
       return json({ error: "Cart is empty" }, 400);
     }
     if (!address || typeof address !== "string") {
       return json({ error: "Address is required" }, 400);
+    }
+    const discountPercent = Number(discount_percent ?? 0);
+    if (!Number.isInteger(discountPercent) || discountPercent < 0 || discountPercent > 5) {
+      return json({ error: "Invalid discount" }, 400);
     }
 
     // Fail fast on missing credentials, before creating an orphan order.
@@ -129,8 +134,11 @@ Deno.serve(async (req) => {
       );
     }
 
+    // The browser chooses the surprise percentage, but the server caps it and
+    // calculates the actual saving from authoritative database prices.
+    const discountAmount = Math.round(subtotal * discountPercent) / 100;
     const shipping = 100;
-    const total = subtotal + shipping;
+    const total = subtotal - discountAmount + shipping;
     if (total <= 0) return json({ error: "Invalid order total" }, 400);
 
     // Create the pending order.
@@ -139,6 +147,8 @@ Deno.serve(async (req) => {
       .insert({
         user_id: user.id,
         total_amount: total,
+        discount_percent: discountPercent,
+        discount_amount: discountAmount,
         address,
         status: "pending",
         payment_provider: "razorpay",
@@ -164,6 +174,8 @@ Deno.serve(async (req) => {
         notes: {
           user_id: user.id,
           phone: String(phone || "").replace(/\D/g, "").slice(-10),
+          discount_percent: String(discountPercent),
+          discount_amount: discountAmount.toFixed(2),
         },
       }),
     });
@@ -207,6 +219,8 @@ Deno.serve(async (req) => {
       dbOrderId: order.id,
       amount: amountPaise,
       currency: "INR",
+      discountPercent,
+      discountAmount,
     });
   } catch (e) {
     console.error("razorpay-create-order error", e);

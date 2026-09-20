@@ -5,13 +5,14 @@ import Footer from '@/components/Footer';
 import { Button } from '@/components/ui/button';
 import { Trash2, ArrowRight, ShoppingCart, AlertCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { MIN_ORDER_VALUE } from '@/lib/constants';
+import { calculateCartDiscount, MIN_ORDER_VALUE } from '@/lib/constants';
 
 const Cart = () => {
-  const { cart, updateQuantity, removeFromCart, clearCart } = useCart();
+  const { cart, updateQuantity, removeFromCart, clearCart, discountPercent } = useCart();
 
   const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-  const total = subtotal; // GST removed as prices are inclusive
+  const discountAmount = calculateCartDiscount(subtotal, discountPercent);
+  const total = subtotal - discountAmount; // GST is included in product prices
   const meetsMinimum = subtotal >= MIN_ORDER_VALUE;
   const amountToMinimum = MIN_ORDER_VALUE - subtotal;
 
@@ -102,6 +103,10 @@ const Cart = () => {
                   <div className="flex justify-between">
                     <span>Subtotal (Incl. taxes)</span>
                     <span className="font-medium text-gray-900">₹{subtotal.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between font-medium text-emerald-700">
+                    <span>Surprise discount ({discountPercent}%)</span>
+                    <span>−₹{discountAmount.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between border-t border-gray-100 pt-4 mt-4">
                     <span className="text-base font-bold text-gray-900">Total</span>

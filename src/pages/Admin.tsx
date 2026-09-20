@@ -16,6 +16,18 @@ import { Loader2, LogOut, Package, Tags, ShoppingBag, Edit2, X, DollarSign, Acti
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
 import { ensureBrandPrefix, stripKnownBrandPrefix } from '@/lib/catalog';
 
+type ProductVariant = {
+  label?: string;
+  price?: number | string;
+  is_default?: boolean;
+  [key: string]: unknown;
+};
+
+const parsePrice = (value: unknown) => {
+  if (typeof value === 'string' && value.trim() === '') return Number.NaN;
+  return Number(value);
+};
+
 const Admin = () => {
   const { user, profile, isLoading, signOut } = useAuth();
   const navigate = useNavigate();
@@ -50,6 +62,7 @@ const Admin = () => {
   const [prodBrand, setProdBrand] = useState('');
   const [prodStock, setProdStock] = useState('100');
   const [prodImages, setProdImages] = useState<string[]>([]);
+  const [prodVariants, setProdVariants] = useState<ProductVariant[]>([]);
   const [isUploadingImages, setIsUploadingImages] = useState(false);
   const [isUploadingBulk, setIsUploadingBulk] = useState(false);
   const [isFixingDescriptions, setIsFixingDescriptions] = useState(false);
@@ -140,7 +153,7 @@ const Admin = () => {
 
   // --- Product Actions ---
   const resetProductForm = () => {
-    setProdName(''); setProdPrice(''); setProdDesc(''); setProdCat(''); setProdBrand(''); setProdStock('100'); setProdImages([]);
+    setProdName(''); setProdPrice(''); setProdDesc(''); setProdCat(''); setProdBrand(''); setProdStock('100'); setProdImages([]); setProdVariants([]);
     setEditingProductId(null);
   };
 
@@ -187,15 +200,34 @@ const Admin = () => {
     e.preventDefault();
     const selectedBrand = brands.find((brand) => brand.id === prodBrand);
     if (!selectedBrand) { toast.error('Select a valid brand.'); return; }
+
+    const hasVariants = prodVariants.length > 0;
+    const variantPrices = prodVariants.map((variant) => parsePrice(variant.price));
+    if (hasVariants && variantPrices.some((price) => !Number.isFinite(price) || price < 0)) {
+      toast.error('Every variant needs a valid price.');
+      return;
+    }
+    const variants = prodVariants.map((variant, index) => ({ ...variant, price: variantPrices[index] }));
+    const enteredPrice = parsePrice(prodPrice);
+
+    if (!hasVariants && (!Number.isFinite(enteredPrice) || enteredPrice < 0)) {
+      toast.error('Enter a valid product price.');
+      return;
+    }
+
+    const productPrice = hasVariants
+      ? Math.min(...variants.map((variant) => Number(variant.price)))
+      : enteredPrice;
     const productData = {
       name: ensureBrandPrefix(stripKnownBrandPrefix(prodName, brands), selectedBrand.name),
       brand_id: selectedBrand.id,
-      price: parseFloat(prodPrice), 
+      price: productPrice,
       description: prodDesc,
       category_id: prodCat, 
       stock: parseInt(prodStock),
       images: prodImages,
-      image_url: prodImages.length > 0 ? prodImages[0] : null
+      image_url: prodImages.length > 0 ? prodImages[0] : null,
+      variants
     };
 
     if (editingProductId) {
@@ -221,8 +253,21 @@ const Admin = () => {
     let imgs = product.images || [];
     if (imgs.length === 0 && product.image_url) imgs = [product.image_url];
     setProdImages(imgs);
+    setProdVariants(
+      Array.isArray(product.variants)
+        ? product.variants
+          .filter((variant: unknown) => variant && typeof variant === 'object' && !Array.isArray(variant))
+          .map((variant: ProductVariant) => ({ ...variant, price: variant.price ?? '' }))
+        : []
+    );
     
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleVariantPriceChange = (index: number, price: string) => {
+    setProdVariants((variants) => variants.map((variant, variantIndex) => (
+      variantIndex === index ? { ...variant, price } : variant
+    )));
   };
 
   const handleDeleteProduct = async (id: string) => {
@@ -361,6 +406,11 @@ const Admin = () => {
   }
 
   const totalRevenue = orders.filter(o => o.status !== 'cancelled').reduce((sum, o) => sum + o.total_amount, 0);
+  const hasProductVariants = prodVariants.length > 0;
+  const validVariantPrices = prodVariants
+    .map((variant) => parsePrice(variant.price))
+    .filter((price) => Number.isFinite(price) && price >= 0);
+  const lowestVariantPrice = validVariantPrices.length > 0 ? Math.min(...validVariantPrices) : null;
 
   return (
     <div className="min-h-screen bg-gray-50 font-poppins">
@@ -491,7 +541,14 @@ const Admin = () => {
                           {expandedOrderId === order.id && (
                             <tr className="bg-gray-50/80 border-b border-gray-100">
                               <td colSpan={6} className="px-8 py-6">
-                                <h4 className="font-semibold text-gray-900 mb-4">Order Items</h4>
+                                <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+                                  <h4 className="font-semibold text-gray-900">Order Items</h4>
+                                  {Number(order.discount_percent) > 0 && (
+                                    <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">
+                                      {Number(order.discount_percent)}% discount · saved ₹{Number(order.discount_amount || 0).toFixed(2)}
+                                    </span>
+                                  )}
+                                </div>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                   {order.order_items?.map((item: any) => {
                                     const img = (item.products?.images && item.products.images.length > 0) ? item.products.images[0] : (item.products?.image_url || '/placeholder.svg');
@@ -546,10 +603,34 @@ const Admin = () => {
                       {prodBrand && prodName.trim() && (
                         <p className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-gray-600">Customer-facing name: <strong>{ensureBrandPrefix(stripKnownBrandPrefix(prodName, brands), brands.find(brand => brand.id === prodBrand)?.name || '')}</strong></p>
                       )}
-                      <div className="grid grid-cols-2 gap-4">
-                        <Input type="number" placeholder="Price (₹)" value={prodPrice} onChange={(e) => setProdPrice(e.target.value)} required />
-                        <Input type="number" placeholder="Stock" value={prodStock} onChange={(e) => setProdStock(e.target.value)} required />
-                      </div>
+                      {hasProductVariants ? (
+                        <div className="space-y-3 rounded-xl border border-primary/20 bg-primary/5 p-4">
+                          <div>
+                            <p className="text-sm font-semibold text-gray-800">Variant prices</p>
+                            <p className="text-xs text-gray-600">Update each option separately. The shop’s starting price is kept in sync with the lowest variant price.</p>
+                          </div>
+                          <div className="space-y-2">
+                            {prodVariants.map((variant, index) => (
+                              <label key={`${variant.label || 'variant'}-${index}`} className="grid grid-cols-[minmax(0,1fr)_8rem] items-center gap-3 rounded-lg bg-white px-3 py-2 text-sm">
+                                <span className="truncate font-medium text-gray-700">{variant.label || `Variant ${index + 1}`}</span>
+                                <Input
+                                  type="number"
+                                  min="0"
+                                  step="0.01"
+                                  aria-label={`Price for ${variant.label || `variant ${index + 1}`}`}
+                                  value={String(variant.price ?? '')}
+                                  onChange={(e) => handleVariantPriceChange(index, e.target.value)}
+                                  required
+                                />
+                              </label>
+                            ))}
+                          </div>
+                          <p className="text-xs font-medium text-primary">Starting price: {lowestVariantPrice === null ? 'Enter valid variant prices' : `₹${lowestVariantPrice.toLocaleString()}`}</p>
+                        </div>
+                      ) : (
+                        <Input type="number" min="0" step="0.01" placeholder="Price (₹)" value={prodPrice} onChange={(e) => setProdPrice(e.target.value)} required />
+                      )}
+                      <Input type="number" min="0" placeholder="Stock" value={prodStock} onChange={(e) => setProdStock(e.target.value)} required />
                       <select 
                         className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                         value={prodCat} onChange={(e) => setProdCat(e.target.value)} required

@@ -10,7 +10,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { CreditCard, ShieldCheck, Loader2, AlertCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
-import { MIN_ORDER_VALUE } from '@/lib/constants';
+import { calculateCartDiscount, MIN_ORDER_VALUE } from '@/lib/constants';
 
 declare global {
   interface RazorpayPaymentResponse {
@@ -44,7 +44,7 @@ declare global {
 }
 
 const Checkout = () => {
-  const { cart } = useCart();
+  const { cart, discountPercent } = useCart();
   const { user, isLoading } = useAuth();
   const [formData, setFormData] = useState({
     name: '', phone: '', address: '', city: '', state: '', zip: '',
@@ -52,8 +52,9 @@ const Checkout = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  const discountAmount = calculateCartDiscount(subtotal, discountPercent);
   const shipping = 100;
-  const total = subtotal + shipping; // GST removed
+  const total = subtotal - discountAmount + shipping; // GST is included in product prices
   // Minimum order value is checked on the cart subtotal, excluding shipping.
   const meetsMinimum = subtotal >= MIN_ORDER_VALUE;
 
@@ -78,6 +79,7 @@ const Checkout = () => {
       const { data, error } = await supabase.functions.invoke('razorpay-create-order', {
         body: {
           items: cart.map((item) => ({ product_id: item.id, quantity: item.quantity })),
+          discount_percent: discountPercent,
           address: fullAddress,
           phone: formData.phone,
         },
@@ -290,6 +292,7 @@ const Checkout = () => {
                 </div>
                 <div className="space-y-2 text-sm border-t border-gray-100 pt-4">
                   <div className="flex justify-between text-gray-600"><span>Subtotal (Incl. taxes):</span> <span>₹{subtotal}</span></div>
+                  <div className="flex justify-between font-medium text-emerald-700"><span>Surprise discount ({discountPercent}%):</span> <span>−₹{discountAmount.toFixed(2)}</span></div>
                   <div className="flex justify-between text-gray-600"><span>Shipping:</span> <span>₹{shipping}</span></div>
                   <div className="flex justify-between font-bold text-lg pt-2 text-gray-900">
                     <span>Total:</span> <span>₹{total.toFixed(2)}</span>
