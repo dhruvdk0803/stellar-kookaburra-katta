@@ -1,48 +1,40 @@
-import React from 'react';
-import { CheckCircle, Shield, Star } from 'lucide-react';
-import { Card, CardContent } from '@/components/ui/card';
-
 const benefits = [
   {
-    icon: Shield,
-    title: 'Premium Quality',
-    description: 'Sourced from top manufacturers for lasting durability and elegance.',
+    number: '01',
+    title: 'Verified quality',
+    description: 'Established brands and dependable specifications.',
   },
   {
-    icon: Star,
-    title: 'Trusted by Architects',
-    description: 'Preferred choice for professional interior projects nationwide.',
+    number: '02',
+    title: 'Project-ready range',
+    description: 'From individual fittings to complete material schedules.',
   },
   {
-    icon: CheckCircle,
-    title: 'Durable Finishes',
-    description: 'Resistant to heat, moisture, and daily wear for long-term beauty.',
+    number: '03',
+    title: 'Human guidance',
+    description: 'Practical help when you need to compare or choose.',
   },
 ];
 
 const WhyChooseKatta = () => {
   return (
-    <section className="py-20 px-4 bg-white">
-      <div className="max-w-4xl mx-auto text-center mb-16">
-        <h2 className="text-4xl font-playfair font-bold text-gray-900 mb-4">Why Choose Katta Interiors?</h2>
-        <p className="text-xl font-poppins text-gray-600">
-          Excellence in every sheet and panel.
-        </p>
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-4xl mx-auto">
-        {benefits.map((benefit, index) => (
-          <Card key={index} className="border-0 shadow-sm hover:shadow-lg transition-all duration-300 rounded-2xl overflow-hidden group">
-            <CardContent className="p-8 flex flex-col items-center text-center space-y-6">
-              <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center shadow-md group-hover:shadow-primary/20 transition-shadow duration-300">
-                <benefit.icon className="h-12 w-12 text-primary group-hover:scale-110 transition-transform duration-300" />
+    <section className="bg-[#17201d] px-4 py-20 text-white sm:px-6 sm:py-24">
+      <div className="mx-auto max-w-7xl">
+        <div className="grid gap-12 lg:grid-cols-[0.8fr_1.2fr] lg:gap-20">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#d8c6a2]">Why Katta</p>
+            <h2 className="mt-4 max-w-md text-3xl font-normal leading-tight sm:text-4xl">A simpler way to source better materials.</h2>
+          </div>
+          <div className="grid gap-0 border-t border-white/[0.15] md:grid-cols-3 md:border-l md:border-t-0">
+            {benefits.map((benefit) => (
+              <div key={benefit.number} className="border-b border-white/[0.15] py-7 md:border-b-0 md:border-r md:px-7 md:py-2">
+                <p className="text-xs text-[#d8c6a2]">{benefit.number}</p>
+                <h3 className="mt-5 text-xl font-normal">{benefit.title}</h3>
+                <p className="mt-3 text-sm leading-6 text-white/[0.58]">{benefit.description}</p>
               </div>
-              <div className="space-y-3">
-                <h3 className="text-xl font-semibold font-playfair text-gray-900">{benefit.title}</h3>
-                <p className="text-gray-600 font-poppins leading-relaxed">{benefit.description}</p>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+            ))}
+          </div>
+        </div>
       </div>
     </section>
   );
