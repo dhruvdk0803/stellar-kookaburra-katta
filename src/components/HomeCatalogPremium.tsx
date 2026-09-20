@@ -16,8 +16,18 @@ interface ShelfProduct {
   shelf_rank: number;
 }
 
-const sortByDisplayOrder = <T extends { display_order?: number; name: string }>(items: T[]) =>
-  [...items].sort((a, b) => (a.display_order || 0) - (b.display_order || 0) || a.name.localeCompare(b.name));
+const directCategoryConfig = [
+  { slug: 'sunmica', label: 'Laminates & Sunmica' },
+  { slug: 'louvers-panels', label: 'Louvers & Wall Panels' },
+  { slug: 'apollo-cpvc-fittings-pipes', label: 'CPVC Pipes & Fittings' },
+  { slug: 'apollo-swr-upvc-pipes-fittings', label: 'uPVC & SWR Pipes' },
+  { slug: 'ebco-hinges', label: 'Hinges' },
+  { slug: 'ebco-drawer-slides', label: 'Drawer Slides' },
+  { slug: 'ebco-digital-locks', label: 'Digital Locks' },
+  { slug: 'jivanjor-adhesives', label: 'Adhesives' },
+  { slug: 'doorskin-rockstar', label: 'Decorative Doorskins' },
+  { slug: 'flexible-interlocking', label: 'Flexible Wall Panels' },
+] as const;
 
 const HomeCatalogPremium = () => {
   const [categories, setCategories] = useState<CategoryCard[]>([]);
@@ -51,10 +61,19 @@ const HomeCatalogPremium = () => {
   }, []);
 
   const featuredCategories = useMemo(() => {
-    const roots = sortByDisplayOrder(categories.filter((category) => category.id === category.root_id));
-    return roots.slice(0, 6).map((root) => {
-      const childWithImage = categories.find((category) => category.root_id === root.id && category.thumbnail_url);
-      return { ...root, thumbnail_url: root.thumbnail_url || childWithImage?.thumbnail_url };
+    return directCategoryConfig.flatMap(({ slug, label }) => {
+      const category = categories.find((item) => item.slug === slug);
+      if (!category) return [];
+
+      const fallbackImage = categories.find(
+        (item) => item.root_id === category.root_id && item.thumbnail_url,
+      )?.thumbnail_url;
+
+      return [{
+        ...category,
+        displayName: label,
+        thumbnail_url: category.thumbnail_url || fallbackImage,
+      }];
     });
   }, [categories]);
 
@@ -95,7 +114,7 @@ const HomeCatalogPremium = () => {
         <div className="mx-auto max-w-7xl">
           <div className="mb-10 flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#8b7655]">Start with what you need</p>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#8b7655]">Browse by product</p>
               <h2 className="mt-3 text-3xl font-normal text-[#17201d] sm:text-4xl">Shop by category</h2>
             </div>
             <Link to="/shop" className="inline-flex items-center text-sm font-medium text-[#17201d] hover:text-[#8b7655]">View the full collection <ArrowRight className="ml-2 h-4 w-4" /></Link>
@@ -104,18 +123,15 @@ const HomeCatalogPremium = () => {
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-5 lg:grid-cols-5">
             {featuredCategories.map((category) => (
               <Link key={category.id} to={categoryShopUrl(category.slug)} className="group">
-                <div className="aspect-[4/5] overflow-hidden rounded-[1.4rem] bg-[#dedbd3]">
+                <div className="aspect-square overflow-hidden rounded-[1.4rem] bg-[#faf9f5] p-3 sm:p-5">
                   {category.thumbnail_url ? (
-                    <img src={category.thumbnail_url} alt="" loading="lazy" className="h-full w-full object-cover transition duration-700 group-hover:scale-105" />
+                    <img src={category.thumbnail_url} alt="" loading="lazy" className="h-full w-full object-contain transition duration-700 group-hover:scale-105" />
                   ) : (
                     <div className="flex h-full items-center justify-center"><PackageSearch className="h-8 w-8 text-[#968e80]" /></div>
                   )}
                 </div>
                 <div className="mt-3 flex items-start justify-between gap-2 px-1">
-                  <div>
-                    <h3 className="text-sm font-medium text-[#17201d] sm:text-base">{category.name}</h3>
-                    <p className="mt-0.5 text-xs text-[#817c72]">{category.product_count} products</p>
-                  </div>
+                  <h3 className="text-sm font-medium leading-5 text-[#17201d] sm:text-base">{category.displayName}</h3>
                   <ArrowRight className="mt-1 h-4 w-4 shrink-0 text-[#8b7655] transition group-hover:translate-x-1" />
                 </div>
               </Link>
