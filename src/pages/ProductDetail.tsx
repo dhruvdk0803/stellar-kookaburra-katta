@@ -15,6 +15,36 @@ import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
+type ProductVariant = {
+  label: string;
+  price: number;
+  image?: string;
+  is_default?: boolean;
+  type?: string;
+};
+
+// Fallbacks keep these finish choices available until the corresponding
+// catalog migration has been applied to an existing store database.
+const IMPERIA_COLOUR_VARIANTS: Record<string, ProductVariant[]> = {
+  'Imperia Digital Lock IM07 | IM08': [
+    { label: 'Black', price: 53198, image: '/images/ebco/ebco-10b.jpg', is_default: true, type: 'color' },
+    { label: 'Anthracite', price: 53198, image: '/images/ebco/ebco-10c.jpg', is_default: false, type: 'color' },
+  ],
+  'Imperia Digital Lock IM05 | IM06': [
+    { label: 'Black', price: 46525, image: '/images/ebco/ebco-11c.jpg', is_default: true, type: 'color' },
+    { label: 'Anthracite', price: 46525, image: '/images/ebco/ebco-11b.jpg', is_default: false, type: 'color' },
+  ],
+  'Imperia Digital Lock IM01 | IM02': [
+    { label: 'Black', price: 38100, image: '/images/ebco/ebco-13b.jpg', is_default: true, type: 'color' },
+    { label: 'Copper', price: 38100, image: '/images/ebco/ebco-13c.jpg', is_default: false, type: 'color' },
+  ],
+};
+
+const getProductVariants = (product: { name?: string; variants?: unknown }): ProductVariant[] => {
+  const storedVariants = Array.isArray(product.variants) ? product.variants as ProductVariant[] : [];
+  return storedVariants.length > 0 ? storedVariants : IMPERIA_COLOUR_VARIANTS[product.name || ''] || [];
+};
+
 const ProductDetail = () => {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
@@ -49,11 +79,12 @@ const ProductDetail = () => {
       // Drafted products (is_active = false) stay reachable by direct URL otherwise.
       if (prodData && prodData.is_active !== false) {
         setProduct(prodData);
-        const vars = Array.isArray(prodData.variants) ? prodData.variants : [];
+        const vars = getProductVariants(prodData);
         const defIdx = vars.findIndex((v: any) => v.is_default);
-        setSelectedVariant(defIdx >= 0 ? defIdx : 0);
         const imgs = (prodData.images && prodData.images.length > 0) ? prodData.images : (prodData.image_url ? [prodData.image_url] : ['/placeholder.svg']);
-        setSelectedImage(imgs[0]);
+        const selectedIdx = defIdx >= 0 ? defIdx : 0;
+        setSelectedVariant(selectedIdx);
+        setSelectedImage(vars[selectedIdx]?.image || imgs[0]);
         
         if (prodData.category_id) {
           const { data: related } = await supabase
@@ -173,9 +204,10 @@ const ProductDetail = () => {
     ? (reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length).toFixed(1) 
     : 0;
 
-  const variants: any[] = Array.isArray(product.variants) ? product.variants : [];
+  const variants = getProductVariants(product);
   const activeVariant = variants[selectedVariant];
   const displayPrice = activeVariant?.price ?? product.price;
+  const variantSelectorLabel = variants[0]?.type === 'color' ? 'Colour' : 'Size / Variant';
 
   const handleAddToCart = () => {
     const variantSuffix = activeVariant && variants.length > 1 ? ` (${activeVariant.label})` : '';
@@ -184,7 +216,7 @@ const ProductDetail = () => {
         id: variantSuffix ? `${product.id}:v${selectedVariant}` : product.id,
         name: product.name + variantSuffix,
         price: displayPrice,
-        image: allImages[0],
+        image: selectedImage || allImages[0],
       },
       quantity
     );
@@ -265,12 +297,15 @@ const ProductDetail = () => {
             {/* Size / Variant selector */}
             {variants.length > 1 && (
               <div className="mb-6">
-                <p className="text-sm font-medium text-gray-700 mb-2">Size / Variant</p>
+                <p className="text-sm font-medium text-gray-700 mb-2">{variantSelectorLabel}</p>
                 <div className="flex flex-wrap gap-2">
                   {variants.map((v, idx) => (
                     <button
                       key={idx}
-                      onClick={() => setSelectedVariant(idx)}
+                      onClick={() => {
+                        setSelectedVariant(idx);
+                        if (v.image) setSelectedImage(v.image);
+                      }}
                       className={cn(
                         'px-4 py-2 rounded-lg text-sm border transition-colors',
                         selectedVariant === idx
