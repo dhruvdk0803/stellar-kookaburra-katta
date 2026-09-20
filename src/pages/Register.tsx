@@ -29,7 +29,7 @@ const Register = () => {
             <CardContent className="p-8">
               <div className="text-center mb-8">
                 <h1 className="text-3xl font-playfair font-bold text-gray-900 mb-2">Create Account</h1>
-                <p className="text-gray-600">Join Katta Plywood and Hardware today</p>
+                <p className="text-gray-600">Join Katta Interiors today</p>
               </div>
               
               <Auth

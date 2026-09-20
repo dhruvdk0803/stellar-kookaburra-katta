@@ -11,7 +11,6 @@ const Footer = () => {
         {/* Company & Contact */}
         <div>
           <h3 className="text-2xl font-playfair font-bold mb-1">Katta Interiors</h3>
-          <p className="text-sm font-poppins font-medium tracking-[0.15em] uppercase text-primary mb-4">Katta Plywood and Hardware</p>
           <p className="text-gray-400 font-poppins mb-4">Premium Sunmica and Panels for modern interiors.</p>
           <div className="space-y-2 text-gray-400 mb-4">
             <div className="flex items-start">
@@ -63,7 +62,7 @@ const Footer = () => {
         </div>
       </div>
       <div className="border-t border-gray-800 mt-8 pt-8 text-center text-gray-400">
-        <p>&copy; {new Date().getFullYear()} KATTA PLYWOOD AND HARDWARE (Katta Interiors). All rights reserved.</p>
+        <p>&copy; {new Date().getFullYear()} Katta Interiors. All rights reserved.</p>
       </div>
     </footer>
   );

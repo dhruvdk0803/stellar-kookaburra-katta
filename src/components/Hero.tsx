@@ -7,7 +7,7 @@ const Hero = () => {
     <section className="overflow-hidden bg-[#f3f0e9] px-4 py-5 sm:px-6 sm:py-8">
       <div className="mx-auto grid min-h-[620px] max-w-[1440px] overflow-hidden rounded-[2rem] bg-[#17201d] lg:grid-cols-[0.9fr_1.1fr]">
         <div className="relative z-10 flex flex-col justify-center px-7 py-16 text-white sm:px-12 lg:px-16 xl:px-20">
-          <p className="mb-6 text-[11px] font-semibold uppercase tracking-[0.28em] text-[#d8c6a2]">Katta Plywood &amp; Hardware · Jaipur</p>
+          <p className="mb-6 text-[11px] font-semibold uppercase tracking-[0.28em] text-[#d8c6a2]">Interior materials · Jaipur</p>
           <h1 className="max-w-xl text-4xl font-normal leading-[1.04] sm:text-5xl lg:text-6xl xl:text-[4.5rem]">
             Materials that make a space feel considered.
           </h1>
