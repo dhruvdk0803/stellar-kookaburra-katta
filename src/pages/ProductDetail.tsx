@@ -143,17 +143,30 @@ const ProductDetail = () => {
 
   const allImages = (product.images && product.images.length > 0) ? product.images : (product.image_url ? [product.image_url] : ['/placeholder.svg']);
   const categoryName = product.categories?.name || product.subcategory || 'Uncategorized';
+  // GST remains stored with the product for administration and order records, but
+  // tax details are not displayed to customers on product pages.
+  const displayDescription = typeof product.description === 'string'
+    ? product.description
+        .split(/\r?\n/)
+        .filter((line: string) => !/\bgst\b/i.test(line))
+        .join('\n')
+        .trim()
+    : '';
   
   const specs = product.specs || {
     'Category': categoryName,
     'Stock Status': product.stock > 0 ? 'In Stock' : 'Out of Stock',
     'Material': 'Premium Quality'
   };
-  // Internal bookkeeping keys are never customer-facing — hide them from the
-  // specs table: 'Source' (seed-script batch tag), 'Demo Video' and
-  // 'Special Notes' (owner-internal notes mistakenly added in Sep-2026 batches).
+  // Internal bookkeeping and tax keys are never customer-facing — hide them from
+  // the specs table: 'Source' (seed-script batch tag), 'Demo Video', 'Special
+  // Notes' (owner-internal notes), and any GST key/value.
   const customerFacingSpecs = Object.fromEntries(
-    Object.entries(specs).filter(([key]) => !['Source', 'Demo Video', 'Special Notes'].includes(key))
+    Object.entries(specs).filter(([key, value]) =>
+      !['Source', 'Demo Video', 'Special Notes'].includes(key) &&
+      !/\bgst\b/i.test(key) &&
+      !/\bgst\b/i.test(String(value))
+    )
   );
 
   const averageRating = reviews.length > 0 
@@ -276,7 +289,7 @@ const ProductDetail = () => {
             )}
 
             <p className="text-gray-600 mb-6 font-poppins text-sm md:text-base whitespace-pre-wrap line-clamp-6">
-              {product.description || 'No description available.'}
+              {displayDescription || 'No description available.'}
             </p>
 
             {/* Quick Specs */}
@@ -331,7 +344,7 @@ const ProductDetail = () => {
             </TabsList>
             <div className="bg-white border border-gray-100 rounded-2xl p-4 sm:p-6 mt-4 shadow-sm">
               <TabsContent value="description" className="mt-0">
-                <p className="text-gray-700 font-poppins leading-relaxed whitespace-pre-wrap text-sm sm:text-base">{product.description}</p>
+                <p className="text-gray-700 font-poppins leading-relaxed whitespace-pre-wrap text-sm sm:text-base">{displayDescription || 'No description available.'}</p>
               </TabsContent>
               <TabsContent value="specs" className="mt-0">
                 <ul className="space-y-3">
