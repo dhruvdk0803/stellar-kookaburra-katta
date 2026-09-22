@@ -108,7 +108,7 @@ const Admin = () => {
     ]);
     if (catRes.data) setCategories(catRes.data);
     if (brandRes.data) setBrands(brandRes.data);
-    if (prodRes.data) setProducts(prodRes.data);
+    setProducts(prodRes);
     if (ordRes.data) setOrders(ordRes.data);
   };
 
