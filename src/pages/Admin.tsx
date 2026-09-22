@@ -5,6 +5,7 @@ import Footer from '@/components/Footer';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { Switch } from '@/components/ui/switch';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/AuthContext';
@@ -27,6 +28,30 @@ const parsePrice = (value: unknown) => {
   if (typeof value === 'string' && value.trim() === '') return Number.NaN;
   return Number(value);
 };
+
+// Supabase limits one response to 1,000 rows. Admin must page through the
+// whole catalog, otherwise its product list and dashboard counts diverge from
+// the public Shop page once the catalog grows beyond that limit.
+async function fetchAllAdminProducts(): Promise<any[]> {
+  const PAGE_SIZE = 1000;
+  const allProducts: any[] = [];
+
+  for (let from = 0; ; from += PAGE_SIZE) {
+    const { data, error } = await supabase
+      .from('products')
+      .select('*, categories(name), brands(name, slug)')
+      .order('created_at', { ascending: false })
+      .order('id', { ascending: false })
+      .range(from, from + PAGE_SIZE - 1);
+
+    if (error) throw error;
+    if (!data || data.length === 0) break;
+    allProducts.push(...data);
+    if (data.length < PAGE_SIZE) break;
+  }
+
+  return allProducts;
+}
 
 const Admin = () => {
   const { user, profile, isLoading, signOut } = useAuth();
@@ -61,6 +86,7 @@ const Admin = () => {
   const [prodCat, setProdCat] = useState('');
   const [prodBrand, setProdBrand] = useState('');
   const [prodStock, setProdStock] = useState('100');
+  const [prodIsActive, setProdIsActive] = useState(true);
   const [prodImages, setProdImages] = useState<string[]>([]);
   const [prodVariants, setProdVariants] = useState<ProductVariant[]>([]);
   const [isUploadingImages, setIsUploadingImages] = useState(false);
@@ -77,7 +103,7 @@ const Admin = () => {
     const [catRes, brandRes, prodRes, ordRes] = await Promise.all([
       supabase.from('categories').select('*, parent:parent_id(name)').order('created_at', { ascending: false }),
       supabase.from('brands').select('*').order('display_order').order('name'),
-      supabase.from('products').select('*, categories(name), brands(name, slug)').order('created_at', { ascending: false }),
+      fetchAllAdminProducts(),
       supabase.from('orders').select('*, profiles(name), order_items(*, products(name, image_url, images))').order('created_at', { ascending: false })
     ]);
     if (catRes.data) setCategories(catRes.data);
@@ -153,7 +179,7 @@ const Admin = () => {
 
   // --- Product Actions ---
   const resetProductForm = () => {
-    setProdName(''); setProdPrice(''); setProdDesc(''); setProdCat(''); setProdBrand(''); setProdStock('100'); setProdImages([]); setProdVariants([]);
+    setProdName(''); setProdPrice(''); setProdDesc(''); setProdCat(''); setProdBrand(''); setProdStock('100'); setProdIsActive(true); setProdImages([]); setProdVariants([]);
     setEditingProductId(null);
   };
 
@@ -225,6 +251,7 @@ const Admin = () => {
       description: prodDesc,
       category_id: prodCat, 
       stock: parseInt(prodStock),
+      is_active: prodIsActive,
       images: prodImages,
       image_url: prodImages.length > 0 ? prodImages[0] : null,
       variants
@@ -249,6 +276,7 @@ const Admin = () => {
     setProdCat(product.category_id || '');
     setProdBrand(product.brand_id || '');
     setProdStock(product.stock?.toString() || '0');
+    setProdIsActive(product.is_active !== false);
     
     let imgs = product.images || [];
     if (imgs.length === 0 && product.image_url) imgs = [product.image_url];
@@ -406,6 +434,7 @@ const Admin = () => {
   }
 
   const totalRevenue = orders.filter(o => o.status !== 'cancelled').reduce((sum, o) => sum + o.total_amount, 0);
+  const activeProductCount = products.filter((product) => product.is_active !== false).length;
   const hasProductVariants = prodVariants.length > 0;
   const validVariantPrices = prodVariants
     .map((variant) => parsePrice(variant.price))
@@ -437,7 +466,7 @@ const Admin = () => {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <Card className="border-0 shadow-sm"><CardContent className="p-6 flex items-center space-x-4"><div className="p-4 bg-green-100 rounded-full"><DollarSign className="h-8 w-8 text-green-600" /></div><div><p className="text-sm font-medium text-gray-500">Total Revenue</p><h3 className="text-2xl font-bold text-gray-900">₹{totalRevenue.toLocaleString()}</h3></div></CardContent></Card>
               <Card className="border-0 shadow-sm"><CardContent className="p-6 flex items-center space-x-4"><div className="p-4 bg-blue-100 rounded-full"><ShoppingBag className="h-8 w-8 text-blue-600" /></div><div><p className="text-sm font-medium text-gray-500">Total Orders</p><h3 className="text-2xl font-bold text-gray-900">{orders.length}</h3></div></CardContent></Card>
-              <Card className="border-0 shadow-sm"><CardContent className="p-6 flex items-center space-x-4"><div className="p-4 bg-purple-100 rounded-full"><Package className="h-8 w-8 text-purple-600" /></div><div><p className="text-sm font-medium text-gray-500">Active Products</p><h3 className="text-2xl font-bold text-gray-900">{products.length}</h3></div></CardContent></Card>
+              <Card className="border-0 shadow-sm"><CardContent className="p-6 flex items-center space-x-4"><div className="p-4 bg-purple-100 rounded-full"><Package className="h-8 w-8 text-purple-600" /></div><div><p className="text-sm font-medium text-gray-500">Live Products</p><h3 className="text-2xl font-bold text-gray-900">{activeProductCount}</h3><p className="text-xs text-gray-500">{products.length} total in Admin</p></div></CardContent></Card>
             </div>
 
             {/* Charts Section */}
@@ -631,6 +660,13 @@ const Admin = () => {
                         <Input type="number" min="0" step="0.01" placeholder="Price (₹)" value={prodPrice} onChange={(e) => setProdPrice(e.target.value)} required />
                       )}
                       <Input type="number" min="0" placeholder="Stock" value={prodStock} onChange={(e) => setProdStock(e.target.value)} required />
+                      <div className="flex items-center justify-between rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5">
+                        <div>
+                          <p className="text-sm font-medium text-gray-800">Show on website</p>
+                          <p className="text-xs text-gray-500">Draft products are visible only in Admin.</p>
+                        </div>
+                        <Switch checked={prodIsActive} onCheckedChange={setProdIsActive} aria-label="Show product on website" />
+                      </div>
                       <select 
                         className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                         value={prodCat} onChange={(e) => setProdCat(e.target.value)} required
@@ -722,7 +758,7 @@ const Admin = () => {
               </div>
 
               <Card className="lg:col-span-2 border-0 shadow-sm">
-                <CardHeader><CardTitle>Product List ({products.length})</CardTitle></CardHeader>
+                <CardHeader><CardTitle>Product List ({products.length} total · {activeProductCount} live)</CardTitle></CardHeader>
                 <CardContent>
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm text-left">
@@ -733,6 +769,7 @@ const Admin = () => {
                           <th className="px-4 py-3">Brand</th>
                           <th className="px-4 py-3">Price</th>
                           <th className="px-4 py-3">Stock</th>
+                          <th className="px-4 py-3">Website</th>
                           <th className="px-4 py-3 text-right">Actions</th>
                         </tr>
                       </thead>
@@ -751,6 +788,11 @@ const Admin = () => {
                               <td className="px-4 py-3 text-gray-600">{product.brands?.name || 'N/A'}</td>
                               <td className="px-4 py-3 font-medium">₹{product.price}</td>
                               <td className="px-4 py-3">{product.stock}</td>
+                              <td className="px-4 py-3">
+                                <span className={product.is_active !== false ? 'inline-flex rounded-full bg-emerald-100 px-2 py-1 text-xs font-medium text-emerald-700' : 'inline-flex rounded-full bg-amber-100 px-2 py-1 text-xs font-medium text-amber-700'}>
+                                  {product.is_active !== false ? 'Live' : 'Draft'}
+                                </span>
+                              </td>
                               <td className="px-4 py-3 text-right space-x-2">
                                 <Button variant="outline" size="icon" onClick={() => handleEditClick(product)} className="h-8 w-8 rounded-full">
                                   <Edit2 className="h-4 w-4 text-blue-600" />
