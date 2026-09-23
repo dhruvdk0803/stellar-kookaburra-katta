@@ -13,7 +13,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Auth } from '@supabase/auth-ui-react';
 import { ThemeSupa } from '@supabase/auth-ui-shared';
-import { Loader2, LogOut, Package, Tags, ShoppingBag, Edit2, X, DollarSign, Activity, LayoutDashboard, ChevronDown, ChevronUp, Upload, Image as ImageIcon, FileSpreadsheet, Wrench } from 'lucide-react';
+import { Loader2, LogOut, Package, Tags, ShoppingBag, Edit2, Trash2, X, DollarSign, Activity, LayoutDashboard, ChevronDown, ChevronUp, Upload, Image as ImageIcon, FileSpreadsheet, Wrench } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
 import { ensureBrandPrefix, stripKnownBrandPrefix } from '@/lib/catalog';
 
@@ -27,6 +27,52 @@ type ProductVariant = {
 const parsePrice = (value: unknown) => {
   if (typeof value === 'string' && value.trim() === '') return Number.NaN;
   return Number(value);
+};
+
+const getErrorMessage = (error: unknown) => {
+  if (error instanceof Error) return error.message;
+  if (error && typeof error === 'object' && 'message' in error) return String(error.message);
+  return String(error);
+};
+
+interface ProductCategoryOption {
+  id: string;
+  name: string;
+  parent_id?: string | null;
+  parent?: { name: string } | null;
+}
+
+interface ProductCategoryAssignment {
+  brand_id?: string | null;
+  category_id?: string | null;
+}
+
+const uploadCatalogImage = async (file: File, folder: 'products' | 'categories' | 'brands') => {
+  if (!file.type.startsWith('image/')) throw new Error('Choose an image file.');
+  const extension = file.name.split('.').pop()?.toLowerCase().replace(/[^a-z0-9]/g, '') || 'image';
+  const uniqueId = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const filePath = `${folder}/${uniqueId}.${extension}`;
+  const { error } = await supabase.storage.from('product-images').upload(filePath, file, { cacheControl: '3600', upsert: false });
+  if (error) throw error;
+  return supabase.storage.from('product-images').getPublicUrl(filePath).data.publicUrl;
+};
+
+const getCategoriesForBrand = (categories: ProductCategoryOption[], products: ProductCategoryAssignment[], brandId: string) => {
+  const usedIds = new Set<string>(
+    products.filter((product) => product.brand_id === brandId && product.category_id).map((product) => product.category_id as string),
+  );
+  if (!usedIds.size) return categories;
+
+  const byId = new Map(categories.map((category) => [category.id, category]));
+  for (const id of [...usedIds]) {
+    let current = byId.get(id);
+    let guard = 0;
+    while (current?.parent_id && guard++ < 20) {
+      usedIds.add(current.parent_id);
+      current = byId.get(current.parent_id);
+    }
+  }
+  return categories.filter((category) => usedIds.has(category.id));
 };
 
 // Supabase limits one response to 1,000 rows. Admin must page through the
@@ -70,6 +116,7 @@ const Admin = () => {
   const [catParentId, setCatParentId] = useState('');
   const [catImage, setCatImage] = useState('');
   const [catOrder, setCatOrder] = useState('0');
+  const [isUploadingCatImage, setIsUploadingCatImage] = useState(false);
 
   // Brand Form States
   const [editingBrandId, setEditingBrandId] = useState<string | null>(null);
@@ -77,6 +124,8 @@ const Admin = () => {
   const [brandSlug, setBrandSlug] = useState('');
   const [brandLogo, setBrandLogo] = useState('');
   const [brandOrder, setBrandOrder] = useState('0');
+  const [isUploadingBrandLogo, setIsUploadingBrandLogo] = useState(false);
+  const [deletingBrandId, setDeletingBrandId] = useState<string | null>(null);
   
   // Product Form States
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
@@ -85,6 +134,7 @@ const Admin = () => {
   const [prodDesc, setProdDesc] = useState('');
   const [prodCat, setProdCat] = useState('');
   const [prodBrand, setProdBrand] = useState('');
+  const [showAllProductCategories, setShowAllProductCategories] = useState(false);
   const [prodStock, setProdStock] = useState('100');
   const [prodIsActive, setProdIsActive] = useState(true);
   const [prodImages, setProdImages] = useState<string[]>([]);
@@ -151,6 +201,21 @@ const Admin = () => {
     setEditingCategoryId(category.id); setCatName(category.name); setCatSlug(category.slug); setCatParentId(category.parent_id || ''); setCatImage(category.image_url || ''); setCatOrder(String(category.display_order || 0));
   };
 
+  const handleCategoryImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsUploadingCatImage(true);
+    try {
+      setCatImage(await uploadCatalogImage(file, 'categories'));
+      toast.success('Category image uploaded. Save the category to keep it.');
+    } catch (error: unknown) {
+      toast.error(`Image upload failed: ${getErrorMessage(error)}`);
+    } finally {
+      setIsUploadingCatImage(false);
+      e.target.value = '';
+    }
+  };
+
   const handleDeleteCategory = async (id: string) => {
     if (!confirm('Delete this category? Products linked to it might be affected.')) return;
     const { error } = await supabase.from('categories').delete().eq('id', id);
@@ -177,9 +242,48 @@ const Admin = () => {
     setEditingBrandId(brand.id); setBrandName(brand.name); setBrandSlug(brand.slug); setBrandLogo(brand.logo_url || ''); setBrandOrder(String(brand.display_order || 0));
   };
 
+  const handleBrandLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsUploadingBrandLogo(true);
+    try {
+      setBrandLogo(await uploadCatalogImage(file, 'brands'));
+      toast.success('Brand logo uploaded. Save the brand to keep it.');
+    } catch (error: unknown) {
+      toast.error(`Logo upload failed: ${getErrorMessage(error)}`);
+    } finally {
+      setIsUploadingBrandLogo(false);
+      e.target.value = '';
+    }
+  };
+
+  const handleDeleteBrand = async (brand: { id: string; name: string }) => {
+    const brandProducts = products.filter((product) => product.brand_id === brand.id);
+    const productCount = brandProducts.length;
+    const categoryCount = new Set(brandProducts.map((product) => product.category_id).filter(Boolean)).size;
+    const confirmed = window.confirm(
+      `Are you sure you want to delete ${brand.name}? This will permanently delete the brand and its ${productCount} product(s). Category records used only by this brand will be removed where safe (up to ${categoryCount} directly used categories); categories shared with other brands and past orders will be preserved. Continue?`,
+    );
+    if (!confirmed) return;
+
+    setDeletingBrandId(brand.id);
+    try {
+      const { data, error } = await supabase.rpc('delete_brand_catalog', { target_brand_id: brand.id });
+      if (error) throw error;
+      const result = data as { deleted_products?: number; deleted_categories?: number } | null;
+      toast.success(`Brand deleted: ${result?.deleted_products ?? productCount} product(s) and ${result?.deleted_categories ?? 0} exclusive category(ies) removed.`);
+      if (editingBrandId === brand.id) resetBrandForm();
+      await fetchData();
+    } catch (error: unknown) {
+      toast.error(`Brand could not be deleted: ${getErrorMessage(error)}`);
+    } finally {
+      setDeletingBrandId(null);
+    }
+  };
+
   // --- Product Actions ---
   const resetProductForm = () => {
-    setProdName(''); setProdPrice(''); setProdDesc(''); setProdCat(''); setProdBrand(''); setProdStock('100'); setProdIsActive(true); setProdImages([]); setProdVariants([]);
+    setProdName(''); setProdPrice(''); setProdDesc(''); setProdCat(''); setProdBrand(''); setShowAllProductCategories(false); setProdStock('100'); setProdIsActive(true); setProdImages([]); setProdVariants([]);
     setEditingProductId(null);
   };
 
@@ -189,33 +293,25 @@ const Admin = () => {
     
     if (prodImages.length + files.length > 50) {
       toast.error("You can only upload up to 50 images per product.");
+      e.target.value = '';
       return;
     }
 
     setIsUploadingImages(true);
     const newImageUrls: string[] = [];
-
-    for (const file of files) {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
-      const filePath = `${fileName}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from('product-images')
-        .upload(filePath, file);
-
-      if (uploadError) {
-        toast.error(`Failed to upload ${file.name}: ${uploadError.message}`);
-        continue;
+    try {
+      for (const file of files) {
+        try {
+          newImageUrls.push(await uploadCatalogImage(file, 'products'));
+        } catch (error: unknown) {
+          toast.error(`Failed to upload ${file.name}: ${getErrorMessage(error)}`);
+        }
       }
-
-      const { data } = supabase.storage.from('product-images').getPublicUrl(filePath);
-      newImageUrls.push(data.publicUrl);
+      setProdImages((previous) => [...previous, ...newImageUrls]);
+    } finally {
+      setIsUploadingImages(false);
+      e.target.value = '';
     }
-
-    setProdImages(prev => [...prev, ...newImageUrls]);
-    setIsUploadingImages(false);
-    e.target.value = '';
   };
 
   const removeImage = (indexToRemove: number) => {
@@ -226,6 +322,10 @@ const Admin = () => {
     e.preventDefault();
     const selectedBrand = brands.find((brand) => brand.id === prodBrand);
     if (!selectedBrand) { toast.error('Select a valid brand.'); return; }
+    if (!(showAllProductCategories ? categories : getCategoriesForBrand(categories, products, selectedBrand.id)).some((category) => category.id === prodCat)) {
+      toast.error('Choose a category currently associated with this brand.');
+      return;
+    }
 
     const hasVariants = prodVariants.length > 0;
     const variantPrices = prodVariants.map((variant) => parsePrice(variant.price));
@@ -275,6 +375,7 @@ const Admin = () => {
     setProdDesc(product.description || '');
     setProdCat(product.category_id || '');
     setProdBrand(product.brand_id || '');
+    setShowAllProductCategories(false);
     setProdStock(product.stock?.toString() || '0');
     setProdIsActive(product.is_active !== false);
     
@@ -340,6 +441,7 @@ const Admin = () => {
         const matchedBrand = brands.find((brand) => brand.slug.toLowerCase() === requestedBrand || brand.name.toLowerCase() === requestedBrand);
         if (!matchedBrand) throw new Error(`Row ${i + 1}: unknown brand "${product.brand_slug || product.brand || ''}".`);
         if (!product.name || !product.category_id) throw new Error(`Row ${i + 1}: name and category_id are required.`);
+        if (!categories.some((category) => category.id === product.category_id)) throw new Error(`Row ${i + 1}: category_id "${product.category_id}" does not exist in Admin.`);
         product.brand_id = matchedBrand.id;
         product.name = ensureBrandPrefix(stripKnownBrandPrefix(product.name, brands), matchedBrand.name);
         delete product.brand;
@@ -435,6 +537,7 @@ const Admin = () => {
 
   const totalRevenue = orders.filter(o => o.status !== 'cancelled').reduce((sum, o) => sum + o.total_amount, 0);
   const activeProductCount = products.filter((product) => product.is_active !== false).length;
+  const productCategoryOptions = prodBrand && !showAllProductCategories ? getCategoriesForBrand(categories, products, prodBrand) : categories;
   const hasProductVariants = prodVariants.length > 0;
   const validVariantPrices = prodVariants
     .map((variant) => parsePrice(variant.price))
@@ -580,12 +683,16 @@ const Admin = () => {
                                 </div>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                   {order.order_items?.map((item: any) => {
-                                    const img = (item.products?.images && item.products.images.length > 0) ? item.products.images[0] : (item.products?.image_url || '/placeholder.svg');
+                                    const img = item.product_image_snapshot || ((item.products?.images && item.products.images.length > 0) ? item.products.images[0] : (item.products?.image_url || '/placeholder.svg'));
+                                    const itemName = item.product_name_snapshot || item.products?.name || 'Unknown Product';
                                     return (
                                       <div key={item.id} className="flex items-center space-x-4 bg-white p-3 rounded-lg border border-gray-100 shadow-sm">
-                                        <img src={img} alt={item.products?.name} className="w-16 h-16 rounded-md object-cover border border-gray-100" />
+                                        <img src={img} alt={itemName} className="w-16 h-16 rounded-md object-cover border border-gray-100" />
                                         <div className="flex-1">
-                                          <p className="font-medium text-gray-900 line-clamp-1">{item.products?.name || 'Unknown Product'}</p>
+                                          <p className="font-medium text-gray-900 line-clamp-1">
+                                            {itemName}
+                                            {item.variant_label ? ` (${item.variant_label})` : ''}
+                                          </p>
                                           <div className="flex justify-between mt-1 text-sm text-gray-500">
                                             <span>Qty: {item.quantity}</span>
                                             <span className="font-medium text-gray-900">₹{item.price * item.quantity}</span>
@@ -624,7 +731,14 @@ const Admin = () => {
                       <Input placeholder="Product name without brand" value={prodName} onChange={(e) => setProdName(e.target.value)} required />
                       <select
                         className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                        value={prodBrand} onChange={(e) => setProdBrand(e.target.value)} required
+                        value={prodBrand}
+                        onChange={(e) => {
+                          const nextBrandId = e.target.value;
+                          setProdBrand(nextBrandId);
+                          setShowAllProductCategories(false);
+                          if (prodCat && !getCategoriesForBrand(categories, products, nextBrandId).some((category) => category.id === prodCat)) setProdCat('');
+                        }}
+                        required
                       >
                         <option value="">Select Brand</option>
                         {brands.map(brand => <option key={brand.id} value={brand.id}>{brand.name}</option>)}
@@ -671,13 +785,21 @@ const Admin = () => {
                         className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                         value={prodCat} onChange={(e) => setProdCat(e.target.value)} required
                       >
-                        <option value="">Select Category</option>
-                        {categories.map(c => (
+                        <option value="">{prodBrand ? 'Select a category used by this brand' : 'Select Category'}</option>
+                        {productCategoryOptions.map(c => (
                           <option key={c.id} value={c.id}>
                             {c.parent ? `${c.parent.name} > ${c.name}` : c.name}
                           </option>
                         ))}
                       </select>
+                      {prodBrand && (
+                        <div className="-mt-2 flex items-center justify-between gap-3 text-xs text-gray-500">
+                          <span>{showAllProductCategories ? 'Showing every category for this product.' : 'Showing categories already used by this brand.'}</span>
+                          <button type="button" className="shrink-0 font-medium text-primary underline-offset-2 hover:underline" onClick={() => setShowAllProductCategories((shown) => !shown)}>
+                            {showAllProductCategories ? 'Show brand categories' : 'Show all categories'}
+                          </button>
+                        </div>
+                      )}
                       <Textarea placeholder="Description" value={prodDesc} onChange={(e) => setProdDesc(e.target.value)} rows={3} />
                       
                       {/* Image Upload Section */}
@@ -818,13 +940,21 @@ const Admin = () => {
               <Card className="lg:col-span-1 border-0 shadow-sm h-fit">
                 <CardHeader className="flex flex-row items-center justify-between">
                   <CardTitle>{editingCategoryId ? 'Edit Category' : 'Add Category'}</CardTitle>
-                  {editingCategoryId && <Button variant="ghost" size="icon" onClick={() => { setEditingCategoryId(null); setCatName(''); setCatSlug(''); setCatParentId(''); setCatImage(''); setCatOrder('0'); }}><X className="h-4 w-4" /></Button>}
+                  {editingCategoryId && <Button variant="ghost" size="icon" disabled={isUploadingCatImage} onClick={() => { setEditingCategoryId(null); setCatName(''); setCatSlug(''); setCatParentId(''); setCatImage(''); setCatOrder('0'); }}><X className="h-4 w-4" /></Button>}
                 </CardHeader>
                 <CardContent>
                   <form onSubmit={handleAddCategory} className="space-y-4">
                     <Input placeholder="Name (e.g. Sunmica)" value={catName} onChange={(e) => setCatName(e.target.value)} required />
                     <Input placeholder="Slug (e.g. sunmica)" value={catSlug} onChange={(e) => setCatSlug(e.target.value)} required />
-                    <Input placeholder="Category image URL (optional)" value={catImage} onChange={(e) => setCatImage(e.target.value)} />
+                    <div className="space-y-2">
+                      <Input placeholder="Category image URL (optional)" value={catImage} onChange={(e) => setCatImage(e.target.value)} />
+                      <label className="inline-flex cursor-pointer items-center rounded-md border border-gray-200 bg-white px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50">
+                        {isUploadingCatImage ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <Upload className="mr-2 h-3.5 w-3.5" />}
+                        {isUploadingCatImage ? 'Uploading…' : 'Choose image from this device'}
+                        <input type="file" accept="image/*" className="hidden" onChange={handleCategoryImageUpload} disabled={isUploadingCatImage} />
+                      </label>
+                      {catImage && <img src={catImage} alt="Category preview" className="h-20 w-28 rounded-md border border-gray-200 bg-white object-contain p-1" />}
+                    </div>
                     <Input type="number" placeholder="Display order" value={catOrder} onChange={(e) => setCatOrder(e.target.value)} />
                     <select 
                       className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
@@ -835,7 +965,7 @@ const Admin = () => {
                         <option key={c.id} value={c.id}>{c.name}</option>
                       ))}
                     </select>
-                    <Button type="submit" className="w-full rounded-full">{editingCategoryId ? 'Update Category' : 'Add Category'}</Button>
+                    <Button type="submit" className="w-full rounded-full" disabled={isUploadingCatImage}>{editingCategoryId ? 'Update Category' : 'Add Category'}</Button>
                   </form>
                 </CardContent>
               </Card>
@@ -887,9 +1017,17 @@ const Admin = () => {
                   <form onSubmit={handleSaveBrand} className="space-y-4">
                     <Input placeholder="Brand name" value={brandName} onChange={(e) => setBrandName(e.target.value)} required />
                     <Input placeholder="Brand slug" value={brandSlug} onChange={(e) => setBrandSlug(e.target.value)} required />
-                    <Input placeholder="Logo URL" value={brandLogo} onChange={(e) => setBrandLogo(e.target.value)} />
+                    <div className="space-y-2">
+                      <Input placeholder="Logo URL (optional)" value={brandLogo} onChange={(e) => setBrandLogo(e.target.value)} />
+                      <label className="inline-flex cursor-pointer items-center rounded-md border border-gray-200 bg-white px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50">
+                        {isUploadingBrandLogo ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <Upload className="mr-2 h-3.5 w-3.5" />}
+                        {isUploadingBrandLogo ? 'Uploading…' : 'Choose logo from this device'}
+                        <input type="file" accept="image/*" className="hidden" onChange={handleBrandLogoUpload} disabled={isUploadingBrandLogo} />
+                      </label>
+                      {brandLogo && <img src={brandLogo} alt="Brand logo preview" className="h-20 w-28 rounded-md border border-gray-200 bg-white object-contain p-1" />}
+                    </div>
                     <Input type="number" placeholder="Display order" value={brandOrder} onChange={(e) => setBrandOrder(e.target.value)} />
-                    <Button type="submit" className="w-full rounded-full">{editingBrandId ? 'Update Brand' : 'Add Brand'}</Button>
+                    <Button type="submit" className="w-full rounded-full" disabled={isUploadingBrandLogo}>{editingBrandId ? 'Update Brand' : 'Add Brand'}</Button>
                   </form>
                 </CardContent>
               </Card>
@@ -902,7 +1040,17 @@ const Admin = () => {
                         {brand.logo_url ? <img src={brand.logo_url} alt="" className="h-full w-full object-contain" /> : <span className="font-bold">{brand.name}</span>}
                       </div>
                       <div className="min-w-0 flex-1"><p className="font-semibold">{brand.name}</p><p className="text-xs text-gray-500">/{brand.slug} · order {brand.display_order || 0}</p></div>
-                      <Button variant="outline" size="icon" onClick={() => handleEditBrand(brand)}><Edit2 className="h-4 w-4" /></Button>
+                      <Button variant="outline" size="icon" aria-label={`Edit ${brand.name}`} onClick={() => handleEditBrand(brand)}><Edit2 className="h-4 w-4" /></Button>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        aria-label={`Delete ${brand.name}`}
+                        className="border-red-100 text-red-600 hover:bg-red-50"
+                        disabled={deletingBrandId === brand.id}
+                        onClick={() => handleDeleteBrand(brand)}
+                      >
+                        {deletingBrandId === brand.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                      </Button>
                     </div>
                   ))}
                 </CardContent>

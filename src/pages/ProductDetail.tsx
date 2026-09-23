@@ -207,7 +207,11 @@ const ProductDetail = () => {
   const variants = getProductVariants(product);
   const activeVariant = variants[selectedVariant];
   const displayPrice = activeVariant?.price ?? product.price;
-  const variantSelectorLabel = variants[0]?.type === 'color' ? 'Colour' : 'Size / Variant';
+  const variantSelectorLabel = variants[0]?.type === 'color'
+    ? 'Colour'
+    : variants[0]?.type === 'size'
+      ? 'Size'
+      : 'Size / Variant';
 
   const handleAddToCart = () => {
     const variantSuffix = activeVariant && variants.length > 1 ? ` (${activeVariant.label})` : '';

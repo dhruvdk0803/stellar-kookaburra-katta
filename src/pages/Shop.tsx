@@ -34,6 +34,38 @@ async function fetchAllProducts(): Promise<any[]> {
   return all;
 }
 
+const normalizeFilterValue = (value: unknown) => String(value || '').toLowerCase().trim();
+
+interface ProductCategoryFacet {
+  id: string;
+  name: string;
+  slug?: string | null;
+  parent_id?: string | null;
+}
+
+interface ProductFacetRow {
+  category_id?: string | null;
+  categories?: ProductCategoryFacet | null;
+}
+
+const getProductCategoryTokens = (product: ProductFacetRow, categoriesById: Map<string, ProductCategoryFacet>) => {
+  const tokens = new Set<string>();
+  let category = categoriesById.get(product.category_id) || product.categories;
+  let guard = 0;
+  while (category && guard++ < 20) {
+    if (category.name) tokens.add(normalizeFilterValue(category.name));
+    if (category.slug) tokens.add(normalizeFilterValue(category.slug));
+    category = category.parent_id ? categoriesById.get(category.parent_id) : null;
+  }
+  return tokens;
+};
+
+const productMatchesSelectedCategories = (product: ProductFacetRow, selectedCategories: string[], categoriesById: Map<string, ProductCategoryFacet>) => {
+  if (!selectedCategories.length) return true;
+  const productTokens = getProductCategoryTokens(product, categoriesById);
+  return selectedCategories.some((category) => productTokens.has(normalizeFilterValue(category)));
+};
+
 const Shop = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const location = useLocation();
@@ -47,10 +79,6 @@ const Shop = () => {
   // Price slider ceiling: the highest-priced active product, rounded up to a
   // clean step, so premium items (e.g. digital locks) are never filtered out.
   const [priceMax, setPriceMax] = useState(10000);
-  // Brands present in the current category/search selection (before brand
-  // filtering), so we only show brand chips when there is more than one.
-  const [availableBrands, setAvailableBrands] = useState<{ name: string; slug: string }[]>([]);
-
   const [filters, setFilters] = useState(() => {
     const categoriesFromUrl = searchParams.getAll('category');
     const brandsFromUrl = searchParams.getAll('brand');
@@ -92,47 +120,46 @@ const Shop = () => {
     fetchData();
   }, []);
 
-  // Apply Filters and Sorting locally
-  useEffect(() => {
-    const search = location.state?.search || searchParams.get('search');
-    let newProducts = [...allProducts];
+  const categoriesById = React.useMemo(() => new Map(categories.map((category) => [category.id, category])), [categories]);
+  const searchTerm = location.state?.search || searchParams.get('search') || '';
+  const searchMatchedProducts = React.useMemo(() => {
+    const normalizedSearch = normalizeFilterValue(searchTerm);
+    return normalizedSearch
+      ? allProducts.filter((product) => normalizeFilterValue(product.name).includes(normalizedSearch))
+      : allProducts;
+  }, [allProducts, searchTerm]);
 
-    // 1. Search
-    if (search) {
-      newProducts = newProducts.filter(p => p.name.toLowerCase().includes(search.toLowerCase()));
-    }
-
-    // 2. Category Filter (Case-insensitive and robust)
-    if (filters.category && filters.category.length > 0) {
-      const filterCats = filters.category.map((c: string) => c.toLowerCase().trim());
-      const categoriesById = new Map(categories.map((category) => [category.id, category]));
-      
-      newProducts = newProducts.filter(p => {
-        let category = categoriesById.get(p.category_id) || p.categories;
-        let guard = 0;
-        while (category && guard++ < 20) {
-          const name = category.name?.toLowerCase().trim();
-          const slug = category.slug?.toLowerCase().trim();
-          if ((name && filterCats.includes(name)) || (slug && filterCats.includes(slug))) return true;
-          category = category.parent_id ? categoriesById.get(category.parent_id) : null;
-        }
-        
-        return false;
-      });
-    }
-    
-    // 3. Brand Filter — only meaningful when a material has >1 brand.
-    // Brands offered are recomputed from the current category/search selection
-    // so the chips always reflect what is actually visible.
+  // Facets cross-filter each other: a selected brand narrows categories, and
+  // selected categories narrow available brands. Exclude each facet's own
+  // current selection so users can still change or clear it.
+  const categoryFacetProducts = React.useMemo(() => {
+    if (!filters.brand.length) return searchMatchedProducts;
+    const selectedBrands = new Set(filters.brand.map(normalizeFilterValue));
+    return searchMatchedProducts.filter((product) => selectedBrands.has(normalizeFilterValue(product.brands?.slug)));
+  }, [filters.brand, searchMatchedProducts]);
+  const visibleCategories = React.useMemo(
+    () => filterNonEmptyCategories(categories, categoryFacetProducts.map((product) => product.category_id)),
+    [categories, categoryFacetProducts],
+  );
+  const availableBrands = React.useMemo(() => {
+    const brandFacetProducts = searchMatchedProducts.filter((product) =>
+      productMatchesSelectedCategories(product, filters.category, categoriesById),
+    );
     const brandMap = new Map<string, { name: string; slug: string }>();
-    newProducts.forEach((product) => {
+    brandFacetProducts.forEach((product) => {
       if (product.brands?.slug && product.brands?.name) brandMap.set(product.brands.slug, product.brands);
     });
-    setAvailableBrands([...brandMap.values()].sort((a, b) => a.name.localeCompare(b.name)));
+    return [...brandMap.values()].sort((a, b) => a.name.localeCompare(b.name));
+  }, [categoriesById, filters.category, searchMatchedProducts]);
 
-    if (filters.brand && filters.brand.length > 0) {
-      const activeBrands = filters.brand.map((b: string) => b.toLowerCase().trim());
-      newProducts = newProducts.filter(p => activeBrands.includes(p.brands?.slug?.toLowerCase().trim()));
+  // Apply Filters and Sorting locally
+  useEffect(() => {
+    let newProducts = searchMatchedProducts.filter((product) =>
+      productMatchesSelectedCategories(product, filters.category, categoriesById),
+    );
+    if (filters.brand.length > 0) {
+      const activeBrands = new Set(filters.brand.map(normalizeFilterValue));
+      newProducts = newProducts.filter((product) => activeBrands.has(normalizeFilterValue(product.brands?.slug)));
     }
 
     // 4. Price Filter
@@ -150,7 +177,7 @@ const Shop = () => {
     }
 
     setFilteredProducts(newProducts);
-  }, [searchParams, location.state, filters, allProducts, sortBy, categories]);
+  }, [filters, searchMatchedProducts, sortBy, categoriesById]);
 
   // Sync URL params to state on initial load or URL change
   useEffect(() => {
@@ -162,22 +189,47 @@ const Shop = () => {
     });
   }, [searchParams]);
 
+  // Also normalize bookmarked or manually edited URLs: a category that does
+  // not exist for the selected brand must not leave an invisible active filter.
+  useEffect(() => {
+    if (!filters.brand.length || !filters.category.length || !allProducts.length) return;
+    const selectedBrands = new Set(filters.brand.map(normalizeFilterValue));
+    const matchingBrandProducts = searchMatchedProducts.filter((product) => selectedBrands.has(normalizeFilterValue(product.brands?.slug)));
+    const validCategories = filters.category.filter((category) =>
+      matchingBrandProducts.some((product) => productMatchesSelectedCategories(product, [category], categoriesById)),
+    );
+    if (validCategories.length === filters.category.length) return;
+
+    const nextFilters = { ...filters, category: validCategories };
+    setFilters(nextFilters);
+    const nextParams = new URLSearchParams();
+    nextFilters.category.forEach((category) => nextParams.append('category', category));
+    nextFilters.brand.forEach((brand) => nextParams.append('brand', brand));
+    const search = searchParams.get('search');
+    if (search) nextParams.set('search', search);
+    setSearchParams(nextParams, { replace: true });
+  }, [allProducts.length, categoriesById, filters, searchMatchedProducts, searchParams, setSearchParams]);
+
   const handleFilterChange = (newFilters: any) => {
-    setFilters(newFilters);
+    const normalizedFilters = { ...newFilters, category: newFilters.category || [], brand: newFilters.brand || [] };
+    const brandSelectionChanged = JSON.stringify(filters.brand) !== JSON.stringify(normalizedFilters.brand);
+    if (brandSelectionChanged && normalizedFilters.brand.length > 0 && normalizedFilters.category.length > 0) {
+      const selectedBrands = new Set(normalizedFilters.brand.map(normalizeFilterValue));
+      const brandProducts = searchMatchedProducts.filter((product) => selectedBrands.has(normalizeFilterValue(product.brands?.slug)));
+      const validCategories = normalizedFilters.category.filter((category: string) =>
+        brandProducts.some((product) => productMatchesSelectedCategories(product, [category], categoriesById)),
+      );
+      normalizedFilters.category = validCategories;
+    }
+
+    setFilters(normalizedFilters);
     const next = new URLSearchParams();
-    newFilters.category.forEach((category: string) => next.append('category', category));
-    newFilters.brand.forEach((brand: string) => next.append('brand', brand));
+    normalizedFilters.category.forEach((category: string) => next.append('category', category));
+    normalizedFilters.brand.forEach((brand: string) => next.append('brand', brand));
     const search = searchParams.get('search');
     if (search) next.set('search', search);
     setSearchParams(next, { replace: true });
   };
-
-  // Only offer categories that actually contain products. The full `categories`
-  // list is still used above to resolve parents when filtering.
-  const visibleCategories = React.useMemo(
-    () => filterNonEmptyCategories(categories, allProducts.map((p) => p.category_id)),
-    [categories, allProducts],
-  );
 
   return (
     <div className="min-h-screen bg-white font-poppins">

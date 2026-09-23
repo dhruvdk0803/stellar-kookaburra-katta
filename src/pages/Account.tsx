@@ -188,12 +188,15 @@ const Account = () => {
                           <div key={item.id} className="py-3 flex items-center justify-between">
                             <div className="flex items-center space-x-4">
                               <img 
-                                src={item.products?.image_url || '/placeholder.svg'} 
-                                alt={item.products?.name} 
+                                src={item.product_image_snapshot || item.products?.image_url || '/placeholder.svg'}
+                                alt={item.product_name_snapshot || item.products?.name || 'Ordered product'}
                                 className="w-12 h-12 rounded-md object-cover border border-gray-100"
                               />
                               <div>
-                                <p className="font-medium text-gray-900">{item.products?.name || 'Unknown Product'}</p>
+                                <p className="font-medium text-gray-900">
+                                  {item.product_name_snapshot || item.products?.name || 'Unknown Product'}
+                                  {item.variant_label ? ` (${item.variant_label})` : ''}
+                                </p>
                                 <p className="text-sm text-gray-500">Qty: {item.quantity}</p>
                               </div>
                             </div>

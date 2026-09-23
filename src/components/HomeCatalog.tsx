@@ -58,12 +58,13 @@ const fallbackBrands = [
 
 const loadLegacyPreview = async () => {
   const categoryResult = await supabase.from('categories').select('id, name, slug, parent_id, image_url, display_order').order('name');
+  let categoryRows = (categoryResult.data || []) as LegacyCategory[];
   if (categoryResult.error) {
     // The merchandising columns are added by the migration; retry using the
     // current production schema so the design remains previewable beforehand.
     const retry = await supabase.from('categories').select('id, name, slug, parent_id').order('name');
     if (retry.error) throw retry.error;
-    categoryResult.data = retry.data;
+    categoryRows = (retry.data || []).map((category) => ({ ...category, image_url: null, display_order: 0 }));
   }
 
   const legacyProducts: LegacyProduct[] = [];
@@ -79,7 +80,7 @@ const loadLegacyPreview = async () => {
     if (!page.data || page.data.length < 1000) break;
   }
 
-  const legacyCategories = (categoryResult.data || []) as LegacyCategory[];
+  const legacyCategories = categoryRows;
   const byId = new Map(legacyCategories.map((category) => [category.id, category]));
   const ancestry = (categoryId: string) => {
     const result: LegacyCategory[] = [];

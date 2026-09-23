@@ -158,10 +158,14 @@ const Navigation = () => {
       <div className="max-w-7xl mx-auto px-4">
         <div className="flex justify-between items-center py-3">
           {/* Logo */}
-          <Link to="/" className="group flex items-center hover:text-primary transition-colors duration-200">
-            <span className="text-2xl font-bold font-playfair text-gray-900 group-hover:text-primary transition-colors duration-200">
-              Katta Interiors
-            </span>
+          <Link to="/" aria-label="Katta Interiors home" className="group flex shrink-0 items-center transition-opacity duration-200 hover:opacity-80">
+            <img
+              src="/images/katta-interiors-logo.jpg"
+              alt="Katta Interiors"
+              className="h-16 w-16 object-contain xl:h-[72px] xl:w-[72px]"
+              width="72"
+              height="72"
+            />
           </Link>
 
           {/* Desktop Menu */}
