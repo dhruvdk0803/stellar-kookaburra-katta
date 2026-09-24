@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Trash2, ArrowRight, ShoppingCart, AlertCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { calculateCartDiscount, MIN_ORDER_VALUE } from '@/lib/constants';
+import { formatRupees } from '@/lib/money';
 
 const Cart = () => {
   const { cart, updateQuantity, removeFromCart, clearCart, discountPercent } = useCart();
@@ -53,7 +54,7 @@ const Cart = () => {
                   
                   <div className="flex-1 w-full pr-8 sm:pr-0">
                     <h3 className="font-semibold text-gray-900 text-lg sm:text-base line-clamp-2">{item.name}</h3>
-                    <p className="text-primary font-bold mt-1">₹{item.price}</p>
+                    <p className="text-primary font-bold mt-1">₹{formatRupees(item.price)}</p>
                   </div>
                   
                   <div className="flex items-center justify-between w-full sm:w-auto mt-2 sm:mt-0 border-t sm:border-t-0 border-gray-100 pt-4 sm:pt-0">
@@ -62,6 +63,7 @@ const Cart = () => {
                         variant="ghost" 
                         size="icon" 
                         className="h-8 w-8 rounded-md"
+                        aria-label={`Decrease quantity of ${item.name}`}
                         onClick={() => updateQuantity(item.id, Math.max(1, item.quantity - 1))}
                       >
                         -
@@ -71,18 +73,20 @@ const Cart = () => {
                         variant="ghost" 
                         size="icon" 
                         className="h-8 w-8 rounded-md"
+                        aria-label={`Increase quantity of ${item.name}`}
                         onClick={() => updateQuantity(item.id, item.quantity + 1)}
                       >
                         +
                       </Button>
                     </div>
-                    <p className="font-bold text-lg sm:text-base ml-6 sm:ml-8 min-w-[80px] text-right">₹{item.price * item.quantity}</p>
+                    <p className="font-bold text-lg sm:text-base ml-6 sm:ml-8 min-w-[80px] text-right">₹{formatRupees(item.price * item.quantity)}</p>
                   </div>
 
                   <Button 
                     variant="ghost" 
                     size="icon" 
                     onClick={() => removeFromCart(item.id)}
+                    aria-label={`Remove ${item.name} from cart`}
                     className="absolute top-4 right-4 sm:relative sm:top-auto sm:right-auto text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full"
                   >
                     <Trash2 className="h-5 w-5" />
@@ -102,15 +106,15 @@ const Cart = () => {
                 <div className="space-y-4 text-sm text-gray-600">
                   <div className="flex justify-between">
                     <span>Subtotal (Incl. taxes)</span>
-                    <span className="font-medium text-gray-900">₹{subtotal.toFixed(2)}</span>
+                    <span className="font-medium text-gray-900">₹{formatRupees(subtotal, true)}</span>
                   </div>
                   <div className="flex justify-between font-medium text-emerald-700">
                     <span>Surprise discount ({discountPercent}%)</span>
-                    <span>−₹{discountAmount.toFixed(2)}</span>
+                    <span>−₹{formatRupees(discountAmount, true)}</span>
                   </div>
                   <div className="flex justify-between border-t border-gray-100 pt-4 mt-4">
                     <span className="text-base font-bold text-gray-900">Total</span>
-                    <span className="text-xl font-bold text-primary">₹{total.toFixed(2)}</span>
+                    <span className="text-xl font-bold text-primary">₹{formatRupees(total, true)}</span>
                   </div>
                 </div>
                 {!meetsMinimum && (
@@ -118,7 +122,7 @@ const Cart = () => {
                     <AlertCircle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
                     <div className="text-sm text-amber-800">
                       <p className="font-semibold">Minimum order value is ₹{MIN_ORDER_VALUE.toLocaleString('en-IN')}</p>
-                      <p className="mt-1">Add ₹{amountToMinimum.toFixed(2)} more to your cart to proceed to checkout.</p>
+                      <p className="mt-1">Add ₹{formatRupees(amountToMinimum, true)} more to your cart to proceed to checkout.</p>
                     </div>
                   </div>
                 )}

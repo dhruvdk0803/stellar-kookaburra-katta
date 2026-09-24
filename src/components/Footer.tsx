@@ -1,7 +1,5 @@
 import React from 'react';
-import { MapPin, Phone, Mail } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { ArrowRight, MapPin, Phone, Mail } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 const Footer = () => {
@@ -51,14 +49,13 @@ const Footer = () => {
           </ul>
         </div>
 
-        {/* Newsletter */}
+        {/* Project help */}
         <div>
-          <h4 className="text-lg font-semibold mb-4">Newsletter</h4>
-          <p className="text-gray-400 mb-4">Subscribe for design tips and exclusive offers.</p>
-          <div className="flex rounded-full overflow-hidden bg-primary/10">
-            <Input placeholder="Your email" className="bg-transparent border-0 text-white placeholder-gray-300 px-4 font-poppins" />
-            <Button className="bg-primary hover:bg-primary/90 rounded-r-full">Subscribe</Button>
-          </div>
+          <h4 className="text-lg font-semibold mb-4">Need help with a project?</h4>
+          <p className="text-gray-400 mb-4">Talk with our team about products, finishes, and availability.</p>
+          <Link to="/contact" className="inline-flex items-center gap-2 font-medium text-white transition-colors hover:text-primary">
+            Contact our team <ArrowRight className="h-4 w-4" />
+          </Link>
         </div>
       </div>
       <div className="border-t border-gray-800 mt-8 pt-8 text-center text-gray-400">

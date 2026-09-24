@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { useCart } from '@/contexts/CartContext';
 import { supabase } from '@/integrations/supabase/client';
+import { formatRupees } from '@/lib/money';
 import { filterNonEmptyCategories, productBrowsingCategories } from '@/lib/categories';
 
 const navItems = [
@@ -271,7 +272,7 @@ const Navigation = () => {
                             <img src={getProductImage(product)} alt={product.name} className="w-10 h-10 rounded object-cover border border-gray-100" />
                             <div className="flex-1 min-w-0">
                               <p className="text-sm font-medium text-gray-900 truncate">{product.name}</p>
-                              <p className="text-xs font-bold text-primary">₹{product.price}</p>
+                              <p className="text-xs font-bold text-primary">₹{formatRupees(product.price)}</p>
                             </div>
                           </div>
                         ))}
@@ -365,7 +366,7 @@ const Navigation = () => {
                                 <img src={getProductImage(product)} alt={product.name} className="w-10 h-10 rounded object-cover" />
                                 <div className="flex-1 min-w-0">
                                   <p className="text-sm font-medium text-gray-900 truncate">{product.name}</p>
-                                  <p className="text-xs font-bold text-primary">₹{product.price}</p>
+                                  <p className="text-xs font-bold text-primary">₹{formatRupees(product.price)}</p>
                                 </div>
                               </div>
                             ))}

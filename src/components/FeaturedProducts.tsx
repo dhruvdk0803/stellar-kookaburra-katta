@@ -5,7 +5,8 @@ import { useCart } from '@/contexts/CartContext';
 import useEmblaCarousel from 'embla-carousel-react';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { formatRupees } from '@/lib/money';
 
 const FeaturedProducts = () => {
   const [emblaRef, emblaApi] = useEmblaCarousel({ 
@@ -17,6 +18,7 @@ const FeaturedProducts = () => {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(true);
   const { addToCart } = useCart();
+  const navigate = useNavigate();
   const [autoPlayInterval, setAutoPlayInterval] = useState<NodeJS.Timeout | null>(null);
   
   const [products, setProducts] = useState<any[]>([]);
@@ -63,6 +65,10 @@ const FeaturedProducts = () => {
   const togglePlay = () => setIsPlaying(!isPlaying);
 
   const handleAddToCart = (product: any) => {
+    if (Array.isArray(product.variants) && product.variants.length > 0) {
+      navigate(`/product/${product.id}`);
+      return;
+    }
     const img = (product.images && product.images.length > 0) ? product.images[0] : (product.image_url || '/placeholder.svg');
     addToCart({ 
       id: product.id, 
@@ -105,14 +111,14 @@ const FeaturedProducts = () => {
                           <Link to={`/product/${product.id}`}>
                             <h3 className="text-xl font-semibold text-gray-900 mb-2 line-clamp-2 hover:text-primary">{product.name}</h3>
                           </Link>
-                          <p className="text-2xl font-bold text-primary mb-4">₹{product.price.toLocaleString()}</p>
+                          <p className="text-2xl font-bold text-primary mb-4">₹{formatRupees(product.price)}</p>
                         </div>
                         <Button 
                           onClick={() => handleAddToCart(product)} 
                           className="w-full rounded-full bg-primary hover:bg-primary/90 text-primary-foreground shadow-md transition-all duration-200 font-medium py-3"
                         >
-                          <ShoppingCart className="mr-2 h-4 w-4" />
-                          Add to Cart
+                          {Array.isArray(product.variants) && product.variants.length > 0 ? null : <ShoppingCart className="mr-2 h-4 w-4" />}
+                          {Array.isArray(product.variants) && product.variants.length > 0 ? 'Choose options' : 'Add to Cart'}
                         </Button>
                       </div>
                     </div>

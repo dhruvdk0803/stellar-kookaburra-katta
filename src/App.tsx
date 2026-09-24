@@ -1,4 +1,4 @@
-import React from 'react';
+import { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
@@ -9,35 +9,31 @@ import { AuthProvider } from '@/contexts/AuthContext';
 import ScrollToTop from '@/components/ScrollToTop';
 import WhatsAppButton from '@/components/WhatsAppButton';
 
-import Index from './pages/Index';
-import Shop from './pages/Shop';
-import ProductDetail from './pages/ProductDetail';
-import About from './pages/About';
-import Projects from './pages/Projects';
-import Blog from './pages/Blog';
-import Contact from './pages/Contact';
-import Cart from './pages/Cart';
-import Checkout from './pages/Checkout';
-import PaymentStatus from './pages/PaymentStatus';
-import Wishlist from './pages/Wishlist';
-import ProjectDetail from './pages/ProjectDetail';
-import BlogPost from './pages/BlogPost';
-import Login from './pages/Login';
-import Register from './pages/Register';
-import ForgotPassword from './pages/ForgotPassword';
-import ResetPassword from './pages/ResetPassword';
-import Account from './pages/Account';
-import Admin from './pages/Admin';
-import NotFound from './pages/NotFound';
-
-// Policy Pages
-import Shipping from './pages/Shipping';
-import Returns from './pages/Returns';
-import PrivacyPolicy from './pages/PrivacyPolicy';
-import TermsOfService from './pages/TermsOfService';
-
-// Plumbing Page (Apollo products, Supabase-driven)
-import Plumbing from './pages/Plumbing';
+const Index = lazy(() => import('./pages/Index'));
+const Shop = lazy(() => import('./pages/Shop'));
+const ProductDetail = lazy(() => import('./pages/ProductDetail'));
+const About = lazy(() => import('./pages/About'));
+const Projects = lazy(() => import('./pages/Projects'));
+const Blog = lazy(() => import('./pages/Blog'));
+const Contact = lazy(() => import('./pages/Contact'));
+const Cart = lazy(() => import('./pages/Cart'));
+const Checkout = lazy(() => import('./pages/Checkout'));
+const PaymentStatus = lazy(() => import('./pages/PaymentStatus'));
+const Wishlist = lazy(() => import('./pages/Wishlist'));
+const ProjectDetail = lazy(() => import('./pages/ProjectDetail'));
+const BlogPost = lazy(() => import('./pages/BlogPost'));
+const Login = lazy(() => import('./pages/Login'));
+const Register = lazy(() => import('./pages/Register'));
+const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
+const ResetPassword = lazy(() => import('./pages/ResetPassword'));
+const Account = lazy(() => import('./pages/Account'));
+const Admin = lazy(() => import('./pages/Admin'));
+const NotFound = lazy(() => import('./pages/NotFound'));
+const Shipping = lazy(() => import('./pages/Shipping'));
+const Returns = lazy(() => import('./pages/Returns'));
+const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'));
+const TermsOfService = lazy(() => import('./pages/TermsOfService'));
+const Plumbing = lazy(() => import('./pages/Plumbing'));
 
 const queryClient = new QueryClient();
 
@@ -51,7 +47,8 @@ const App = () => (
             <BrowserRouter>
               <ScrollToTop />
               <WhatsAppButton />
-              <Routes>
+              <Suspense fallback={<main className="flex min-h-screen items-center justify-center bg-white text-sm text-gray-500" role="status" aria-live="polite">Loading page…</main>}>
+                <Routes>
                 <Route path="/" element={<Index />} />
                 <Route path="/shop" element={<Shop />} />
                 <Route path="/plumbing" element={<Plumbing />} />
@@ -80,7 +77,8 @@ const App = () => (
                 <Route path="/terms-of-service" element={<TermsOfService />} />
                 
                 <Route path="*" element={<NotFound />} />
-              </Routes>
+                </Routes>
+              </Suspense>
             </BrowserRouter>
           </WishlistProvider>
         </CartProvider>

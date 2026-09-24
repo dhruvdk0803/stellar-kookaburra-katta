@@ -2,7 +2,8 @@
 // Applies to the cart subtotal, excluding shipping charges.
 export const MIN_ORDER_VALUE = 2000;
 
-// A cart receives a small surprise discount whenever its contents change.
+// Each new cart receives a small surprise discount; it stays fixed while the
+// shopper edits quantities so the displayed total does not change unexpectedly.
 export const MIN_CART_DISCOUNT_PERCENT = 1;
 export const MAX_CART_DISCOUNT_PERCENT = 5;
 

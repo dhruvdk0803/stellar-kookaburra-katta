@@ -11,6 +11,7 @@ import { CreditCard, ShieldCheck, Loader2, AlertCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { calculateCartDiscount, MIN_ORDER_VALUE } from '@/lib/constants';
+import { formatRupees } from '@/lib/money';
 
 declare global {
   interface RazorpayPaymentResponse {
@@ -43,6 +44,35 @@ declare global {
   }
 }
 
+let razorpayScriptPromise: Promise<void> | null = null;
+
+const ensureRazorpayScript = () => {
+  if (window.Razorpay) return Promise.resolve();
+  if (razorpayScriptPromise) return razorpayScriptPromise;
+
+  razorpayScriptPromise = new Promise<void>((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    script.async = true;
+    script.onload = () => {
+      if (window.Razorpay) resolve();
+      else {
+        razorpayScriptPromise = null;
+        script.remove();
+        reject(new Error('The Razorpay payment form could not load. Please try again.'));
+      }
+    };
+    script.onerror = () => {
+      razorpayScriptPromise = null;
+      script.remove();
+      reject(new Error('The Razorpay payment form could not load. Check your connection and try again.'));
+    };
+    document.head.appendChild(script);
+  });
+
+  return razorpayScriptPromise;
+};
+
 const Checkout = () => {
   const { cart, discountPercent } = useCart();
   const { user, isLoading } = useAuth();
@@ -72,6 +102,7 @@ const Checkout = () => {
     setIsSubmitting(true);
 
     try {
+      await ensureRazorpayScript();
       // Create the Razorpay order server-side. The Edge Function recomputes the
       // total from DB prices, creates the pending order, and returns the
       // Razorpay key id + order id needed to open checkout.
@@ -89,10 +120,6 @@ const Checkout = () => {
       if (data?.error || !data?.rzpOrderId) {
         throw new Error(data?.error || 'Could not start Razorpay payment.');
       }
-      if (!window.Razorpay) {
-        throw new Error('The Razorpay payment form could not load. Please check your connection and try again.');
-      }
-
       const dbOrderId = data.dbOrderId;
       const rzp = new window.Razorpay({
         key: data.keyId,
@@ -286,16 +313,16 @@ const Checkout = () => {
                         <img src={item.image} alt={item.name} className="w-10 h-10 rounded object-cover" />
                         <span>{item.name} <span className="text-gray-500">x{item.quantity}</span></span>
                       </div>
-                      <span className="font-medium">₹{item.price * item.quantity}</span>
+                      <span className="font-medium">₹{formatRupees(item.price * item.quantity)}</span>
                     </div>
                   ))}
                 </div>
                 <div className="space-y-2 text-sm border-t border-gray-100 pt-4">
-                  <div className="flex justify-between text-gray-600"><span>Subtotal (Incl. taxes):</span> <span>₹{subtotal}</span></div>
-                  <div className="flex justify-between font-medium text-emerald-700"><span>Surprise discount ({discountPercent}%):</span> <span>−₹{discountAmount.toFixed(2)}</span></div>
-                  <div className="flex justify-between text-gray-600"><span>Shipping:</span> <span>₹{shipping}</span></div>
+                  <div className="flex justify-between text-gray-600"><span>Subtotal (Incl. taxes):</span> <span>₹{formatRupees(subtotal, true)}</span></div>
+                  <div className="flex justify-between font-medium text-emerald-700"><span>Surprise discount ({discountPercent}%):</span> <span>−₹{formatRupees(discountAmount, true)}</span></div>
+                  <div className="flex justify-between text-gray-600"><span>Shipping:</span> <span>₹{formatRupees(shipping)}</span></div>
                   <div className="flex justify-between font-bold text-lg pt-2 text-gray-900">
-                    <span>Total:</span> <span>₹{total.toFixed(2)}</span>
+                    <span>Total:</span> <span>₹{formatRupees(total, true)}</span>
                   </div>
                 </div>
               </CardContent>
@@ -307,7 +334,7 @@ const Checkout = () => {
                 <div className="text-sm text-amber-800">
                   <p className="font-semibold">Minimum order value is ₹{MIN_ORDER_VALUE.toLocaleString('en-IN')}</p>
                   <p className="mt-1">
-                    Your cart subtotal is ₹{subtotal.toFixed(2)}. Add ₹{(MIN_ORDER_VALUE - subtotal).toFixed(2)} more to place this order.{' '}
+                    Your cart subtotal is ₹{formatRupees(subtotal, true)}. Add ₹{formatRupees(MIN_ORDER_VALUE - subtotal, true)} more to place this order.{' '}
                     <Link to="/shop" className="underline font-medium">Continue shopping</Link>
                   </p>
                 </div>
@@ -319,7 +346,7 @@ const Checkout = () => {
               disabled={isSubmitting || cart.length === 0 || !meetsMinimum}
               className="w-full rounded-full bg-primary hover:bg-primary/90 text-primary-foreground text-lg py-6 shadow-lg"
             >
-              {isSubmitting ? <Loader2 className="h-5 w-5 animate-spin" /> : `Pay ₹${total.toFixed(2)}`}
+              {isSubmitting ? <Loader2 className="h-5 w-5 animate-spin" /> : `Pay ₹${formatRupees(total, true)}`}
             </Button>
           </form>
         </div>

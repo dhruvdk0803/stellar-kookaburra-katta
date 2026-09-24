@@ -14,6 +14,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { stripKnownBrandPrefix } from '@/lib/catalog';
+import { formatRupees } from '@/lib/money';
 
 type ProductVariant = {
   label: string;
@@ -207,11 +209,17 @@ const ProductDetail = () => {
   const variants = getProductVariants(product);
   const activeVariant = variants[selectedVariant];
   const displayPrice = activeVariant?.price ?? product.price;
-  const variantSelectorLabel = variants[0]?.type === 'color'
+  const variantType = variants[0]?.type?.toLowerCase();
+  const variantSelectorLabel = variantType === 'color' || variantType === 'colour'
     ? 'Colour'
-    : variants[0]?.type === 'size'
+    : variantType === 'size'
       ? 'Size'
-      : 'Size / Variant';
+      : variantType === 'finish'
+        ? 'Finish'
+        : 'Choose an option';
+  const displayName = product.brands?.name
+    ? stripKnownBrandPrefix(product.name, [{ name: product.brands.name }])
+    : product.name;
 
   const handleAddToCart = () => {
     const variantSuffix = activeVariant && variants.length > 1 ? ` (${activeVariant.label})` : '';
@@ -260,10 +268,10 @@ const ProductDetail = () => {
           </div>
 
           <div>
-            {product.brands?.name && <p className="mb-2 text-xs font-bold uppercase tracking-[0.18em] text-primary/65">{product.brands.name}</p>}
-            <div className="flex justify-between items-start mb-2">
-              <h1 className="text-2xl md:text-3xl font-playfair font-bold text-gray-900 pr-4">{product.name}</h1>
-              <div className="flex items-center gap-2 flex-shrink-0">
+            {product.brands?.name && displayName !== product.brands.name && <p className="mb-2 text-xs font-bold uppercase tracking-[0.18em] text-primary/65">{product.brands.name}</p>}
+            <div className="mb-2 flex flex-col items-start gap-3 sm:flex-row sm:justify-between">
+              <h1 className="min-w-0 flex-1 text-2xl font-playfair font-bold text-gray-900 md:text-3xl">{displayName}</h1>
+              <div className="flex shrink-0 items-center gap-2">
                 <Button
                   variant="outline"
                   onClick={() => shareProduct(product.name, `${window.location.origin}/product/${product.id}`)}
@@ -276,6 +284,7 @@ const ProductDetail = () => {
                   variant="ghost"
                   size="icon"
                   onClick={() => toggleWishlist(product.id)}
+                  aria-label={isInWishlist(product.id) ? 'Remove from wishlist' : 'Add to wishlist'}
                   className="rounded-full border-2 border-gray-200 hover:border-primary/50"
                 >
                   <Heart className={cn('h-5 w-5 md:h-6 md:w-6', isInWishlist(product.id) ? 'text-red-500 fill-red-500' : 'text-gray-400')} />
@@ -296,7 +305,7 @@ const ProductDetail = () => {
               </div>
             )}
 
-            <p className="text-primary font-bold text-3xl md:text-4xl mb-6">₹{displayPrice}</p>
+            <p className="text-primary font-bold text-3xl md:text-4xl mb-6">₹{formatRupees(displayPrice)}</p>
 
             {/* Size / Variant selector */}
             {variants.length > 1 && (
@@ -310,6 +319,7 @@ const ProductDetail = () => {
                         setSelectedVariant(idx);
                         if (v.image) setSelectedImage(v.image);
                       }}
+                      aria-pressed={selectedVariant === idx}
                       className={cn(
                         'px-4 py-2 rounded-lg text-sm border transition-colors',
                         selectedVariant === idx
@@ -319,7 +329,7 @@ const ProductDetail = () => {
                     >
                       <span className="font-medium">{v.label}</span>
                       <span className={cn('ml-2', selectedVariant === idx ? 'text-primary-foreground/80' : 'text-gray-500')}>
-                        ₹{v.price}
+                        ₹{formatRupees(v.price)}
                       </span>
                     </button>
                   ))}
@@ -342,8 +352,9 @@ const ProductDetail = () => {
             </div>
 
             <div className="flex items-center space-x-4 mb-6">
-              <label className="text-sm font-medium text-gray-700">Quantity:</label>
+              <label htmlFor="product-quantity" className="text-sm font-medium text-gray-700">Quantity:</label>
               <input
+                id="product-quantity"
                 type="number"
                 min="1"
                 max={product.stock || 100}

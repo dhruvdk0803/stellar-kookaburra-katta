@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { ArrowRight, Loader2, PackageSearch } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { Brand, CategoryCard, brandShopUrl, categoryShopUrl } from '@/lib/catalog';
+import { Brand, CategoryCard, brandShopUrl, categoryShopUrl, stripKnownBrandPrefix } from '@/lib/catalog';
+import { formatRupees } from '@/lib/money';
 
 interface ShelfProduct {
   id: string;
@@ -158,8 +159,8 @@ const HomeCatalogPremium = () => {
                   <div className="mt-4 flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#94856d]">{product.brand_name || product.root_name}</p>
-                      <h3 className="mt-1 line-clamp-2 text-sm font-medium leading-5 text-[#17201d] sm:text-base">{product.name}</h3>
-                      <p className="mt-2 text-sm font-semibold text-[#17201d]">₹{Number(product.price).toLocaleString('en-IN')}</p>
+                      <h3 className="mt-1 line-clamp-2 text-sm font-medium leading-5 text-[#17201d] sm:text-base">{stripKnownBrandPrefix(product.name, [{ name: product.brand_name || product.root_name }])}</h3>
+                      <p className="mt-2 text-sm font-semibold text-[#17201d]">₹{formatRupees(product.price)}</p>
                     </div>
                     <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#d8d3c8] transition group-hover:border-[#17201d] group-hover:bg-[#17201d] group-hover:text-white"><ArrowRight className="h-4 w-4" /></span>
                   </div>

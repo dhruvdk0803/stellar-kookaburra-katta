@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useReducer, useEffect } from 'react';
+import React, { createContext, useContext, useReducer, useEffect, useCallback } from 'react';
 import { MAX_CART_DISCOUNT_PERCENT, MIN_CART_DISCOUNT_PERCENT } from '@/lib/constants';
 
 interface CartItem {
@@ -10,6 +10,49 @@ interface CartItem {
 }
 
 type CartState = CartItem[];
+
+const loadSavedCart = (): CartState => {
+  try {
+    const saved = localStorage.getItem('katta-cart');
+    if (!saved) return [];
+    const parsed: unknown = JSON.parse(saved);
+    if (!Array.isArray(parsed)) return [];
+
+    return parsed.flatMap((entry): CartItem[] => {
+      if (!entry || typeof entry !== 'object') return [];
+      const item = entry as Partial<CartItem>;
+      const price = Number(item.price);
+      const quantity = Number(item.quantity);
+      if (
+        typeof item.id !== 'string' || !item.id ||
+        typeof item.name !== 'string' || !item.name ||
+        !Number.isFinite(price) || price <= 0 ||
+        !Number.isInteger(quantity) || quantity <= 0
+      ) return [];
+
+      return [{
+        id: item.id,
+        name: item.name,
+        price,
+        quantity,
+        image: typeof item.image === 'string' && item.image ? item.image : '/placeholder.svg',
+      }];
+    });
+  } catch {
+    return [];
+  }
+};
+
+const loadSavedDiscount = () => {
+  try {
+    const saved = Number(localStorage.getItem('katta-cart-discount'));
+    return Number.isInteger(saved) && saved >= MIN_CART_DISCOUNT_PERCENT && saved <= MAX_CART_DISCOUNT_PERCENT
+      ? saved
+      : nextDiscountPercent(0);
+  } catch {
+    return nextDiscountPercent(0);
+  }
+};
 
 type CartAction =
   | { type: 'ADD_TO_CART'; item: Omit<CartItem, 'quantity'>; quantity?: number }
@@ -70,48 +113,33 @@ export const useCart = () => {
 };
 
 export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [cart, dispatch] = useReducer(cartReducer, [], () => {
-    const saved = localStorage.getItem('katta-cart');
-    return saved ? JSON.parse(saved) : [];
-  });
-  const [discountPercent, setDiscountPercent] = React.useState(() => {
-    const saved = Number(localStorage.getItem('katta-cart-discount'));
-    return Number.isInteger(saved) && saved >= MIN_CART_DISCOUNT_PERCENT && saved <= MAX_CART_DISCOUNT_PERCENT
-      ? saved
-      : nextDiscountPercent(0);
-  });
+  const [cart, dispatch] = useReducer(cartReducer, [], loadSavedCart);
+  const [discountPercent, setDiscountPercent] = React.useState(loadSavedDiscount);
 
   useEffect(() => {
-    localStorage.setItem('katta-cart', JSON.stringify(cart));
+    try { localStorage.setItem('katta-cart', JSON.stringify(cart)); } catch { /* Storage can be unavailable in private browsing. */ }
   }, [cart]);
 
   useEffect(() => {
-    localStorage.setItem('katta-cart-discount', String(discountPercent));
+    try { localStorage.setItem('katta-cart-discount', String(discountPercent)); } catch { /* Storage can be unavailable in private browsing. */ }
   }, [discountPercent]);
 
-  const rerollDiscount = () => {
-    setDiscountPercent((current) => nextDiscountPercent(current));
-  };
-
-  const addToCart = (item: Omit<CartItem, 'quantity'>, quantity = 1) => {
+  const addToCart = useCallback((item: Omit<CartItem, 'quantity'>, quantity = 1) => {
+    if (cart.length === 0) setDiscountPercent((current) => nextDiscountPercent(current));
     dispatch({ type: 'ADD_TO_CART', item, quantity });
-    rerollDiscount();
-  };
+  }, [cart.length]);
 
-  const removeFromCart = (id: string) => {
+  const removeFromCart = useCallback((id: string) => {
     dispatch({ type: 'REMOVE_FROM_CART', id });
-    rerollDiscount();
-  };
+  }, []);
 
-  const updateQuantity = (id: string, quantity: number) => {
+  const updateQuantity = useCallback((id: string, quantity: number) => {
     dispatch({ type: 'UPDATE_QUANTITY', id, quantity });
-    rerollDiscount();
-  };
+  }, []);
 
-  const clearCart = () => {
+  const clearCart = useCallback(() => {
     dispatch({ type: 'CLEAR_CART' });
-    setDiscountPercent(nextDiscountPercent(discountPercent));
-  };
+  }, []);
 
   const cartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
 

@@ -20,7 +20,9 @@ import { ensureBrandPrefix, stripKnownBrandPrefix } from '@/lib/catalog';
 type ProductVariant = {
   label?: string;
   price?: number | string;
+  image?: string;
   is_default?: boolean;
+  type?: string;
   [key: string]: unknown;
 };
 
@@ -139,6 +141,7 @@ const Admin = () => {
   const [prodIsActive, setProdIsActive] = useState(true);
   const [prodImages, setProdImages] = useState<string[]>([]);
   const [prodVariants, setProdVariants] = useState<ProductVariant[]>([]);
+  const [prodVariantType, setProdVariantType] = useState('size');
   const [isUploadingImages, setIsUploadingImages] = useState(false);
   const [isUploadingBulk, setIsUploadingBulk] = useState(false);
   const [isFixingDescriptions, setIsFixingDescriptions] = useState(false);
@@ -283,7 +286,7 @@ const Admin = () => {
 
   // --- Product Actions ---
   const resetProductForm = () => {
-    setProdName(''); setProdPrice(''); setProdDesc(''); setProdCat(''); setProdBrand(''); setShowAllProductCategories(false); setProdStock('100'); setProdIsActive(true); setProdImages([]); setProdVariants([]);
+    setProdName(''); setProdPrice(''); setProdDesc(''); setProdCat(''); setProdBrand(''); setShowAllProductCategories(false); setProdStock('100'); setProdIsActive(true); setProdImages([]); setProdVariants([]); setProdVariantType('size');
     setEditingProductId(null);
   };
 
@@ -329,15 +332,41 @@ const Admin = () => {
 
     const hasVariants = prodVariants.length > 0;
     const variantPrices = prodVariants.map((variant) => parsePrice(variant.price));
-    if (hasVariants && variantPrices.some((price) => !Number.isFinite(price) || price < 0)) {
-      toast.error('Every variant needs a valid price.');
+    if (hasVariants && prodVariants.length < 2) {
+      toast.error('Add at least two options, or remove variant mode to save a single product.');
       return;
     }
-    const variants = prodVariants.map((variant, index) => ({ ...variant, price: variantPrices[index] }));
+    const variantLabels = prodVariants.map((variant) => variant.label?.trim() || '');
+    if (hasVariants && variantLabels.some((label) => !label)) {
+      toast.error('Every option needs a label, such as 1/2 inch or Black.');
+      return;
+    }
+    if (hasVariants && new Set(variantLabels.map((label) => label.toLocaleLowerCase())).size !== variantLabels.length) {
+      toast.error('Variant labels must be unique.');
+      return;
+    }
+    if (hasVariants && variantPrices.some((price) => !Number.isFinite(price) || price <= 0)) {
+      toast.error('Every option needs a price greater than zero.');
+      return;
+    }
+    const stock = parsePrice(prodStock);
+    if (!Number.isInteger(stock) || stock < 0) {
+      toast.error('Stock must be a whole number equal to or greater than zero.');
+      return;
+    }
+    const defaultIndex = prodVariants.findIndex((variant) => variant.is_default);
+    const variants = prodVariants.map((variant, index) => ({
+      ...variant,
+      label: variantLabels[index],
+      price: variantPrices[index],
+      type: prodVariantType,
+      image: variant.image || undefined,
+      is_default: index === (defaultIndex >= 0 ? defaultIndex : 0),
+    }));
     const enteredPrice = parsePrice(prodPrice);
 
-    if (!hasVariants && (!Number.isFinite(enteredPrice) || enteredPrice < 0)) {
-      toast.error('Enter a valid product price.');
+    if (!hasVariants && (!Number.isFinite(enteredPrice) || enteredPrice <= 0)) {
+      toast.error('Enter a product price greater than zero.');
       return;
     }
 
@@ -350,7 +379,7 @@ const Admin = () => {
       price: productPrice,
       description: prodDesc,
       category_id: prodCat, 
-      stock: parseInt(prodStock),
+      stock,
       is_active: prodIsActive,
       images: prodImages,
       image_url: prodImages.length > 0 ? prodImages[0] : null,
@@ -389,14 +418,46 @@ const Admin = () => {
           .map((variant: ProductVariant) => ({ ...variant, price: variant.price ?? '' }))
         : []
     );
+    const savedVariantType = Array.isArray(product.variants)
+      ? product.variants.find((variant: ProductVariant) => variant && typeof variant.type === 'string')?.type
+      : undefined;
+    const normalizedVariantType = typeof savedVariantType === 'string' ? savedVariantType.toLowerCase() : '';
+    setProdVariantType(normalizedVariantType === 'colour' ? 'color' : ['size', 'color', 'finish', 'option'].includes(normalizedVariantType) ? normalizedVariantType : 'option');
     
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleVariantPriceChange = (index: number, price: string) => {
+  const handleVariantChange = (index: number, field: 'label' | 'price' | 'image', value: string) => {
     setProdVariants((variants) => variants.map((variant, variantIndex) => (
-      variantIndex === index ? { ...variant, price } : variant
+      variantIndex === index ? { ...variant, [field]: value || undefined } : variant
     )));
+  };
+
+  const addProductVariant = () => {
+    setProdVariants((variants) => [...variants, {
+      label: '',
+      price: '',
+      type: prodVariantType,
+      is_default: variants.length === 0,
+      image: prodImages[0] || undefined,
+    }]);
+  };
+
+  const removeProductVariant = (index: number) => {
+    setProdVariants((variants) => {
+      const next = variants.filter((_, variantIndex) => variantIndex !== index);
+      if (variants[index]?.is_default && next.length > 0) {
+        next[0] = { ...next[0], is_default: true };
+      }
+      return next;
+    });
+  };
+
+  const setDefaultProductVariant = (index: number) => {
+    setProdVariants((variants) => variants.map((variant, variantIndex) => ({
+      ...variant,
+      is_default: variantIndex === index,
+    })));
   };
 
   const handleDeleteProduct = async (id: string) => {
@@ -746,33 +807,95 @@ const Admin = () => {
                       {prodBrand && prodName.trim() && (
                         <p className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-gray-600">Customer-facing name: <strong>{ensureBrandPrefix(stripKnownBrandPrefix(prodName, brands), brands.find(brand => brand.id === prodBrand)?.name || '')}</strong></p>
                       )}
-                      {hasProductVariants ? (
-                        <div className="space-y-3 rounded-xl border border-primary/20 bg-primary/5 p-4">
+                      <div className="space-y-3 rounded-xl border border-primary/20 bg-primary/5 p-4">
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                           <div>
-                            <p className="text-sm font-semibold text-gray-800">Variant prices</p>
-                            <p className="text-xs text-gray-600">Update each option separately. The shop’s starting price is kept in sync with the lowest variant price.</p>
+                            <p className="text-sm font-semibold text-gray-800">Product options</p>
+                            <p className="text-xs text-gray-600">Add sizes, colours, finishes, or other choices. Each option can have its own price and product image.</p>
                           </div>
-                          <div className="space-y-2">
-                            {prodVariants.map((variant, index) => (
-                              <label key={`${variant.label || 'variant'}-${index}`} className="grid grid-cols-[minmax(0,1fr)_8rem] items-center gap-3 rounded-lg bg-white px-3 py-2 text-sm">
-                                <span className="truncate font-medium text-gray-700">{variant.label || `Variant ${index + 1}`}</span>
-                                <Input
-                                  type="number"
-                                  min="0"
-                                  step="0.01"
-                                  aria-label={`Price for ${variant.label || `variant ${index + 1}`}`}
-                                  value={String(variant.price ?? '')}
-                                  onChange={(e) => handleVariantPriceChange(index, e.target.value)}
-                                  required
-                                />
-                              </label>
-                            ))}
-                          </div>
-                          <p className="text-xs font-medium text-primary">Starting price: {lowestVariantPrice === null ? 'Enter valid variant prices' : `₹${lowestVariantPrice.toLocaleString()}`}</p>
+                          <Button type="button" variant="outline" onClick={addProductVariant} className="shrink-0 bg-white">Add option</Button>
                         </div>
-                      ) : (
-                        <Input type="number" min="0" step="0.01" placeholder="Price (₹)" value={prodPrice} onChange={(e) => setProdPrice(e.target.value)} required />
-                      )}
+                        {hasProductVariants ? (
+                          <>
+                            <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_8rem]">
+                              <label className="text-xs font-medium text-gray-600">
+                                Option type
+                                <select
+                                  className="mt-1 flex h-10 w-full rounded-md border border-input bg-white px-3 py-2 text-sm text-gray-900"
+                                  value={prodVariantType}
+                                  onChange={(e) => setProdVariantType(e.target.value)}
+                                >
+                                  <option value="size">Size</option>
+                                  <option value="color">Colour</option>
+                                  <option value="finish">Finish</option>
+                                  <option value="option">Other option</option>
+                                </select>
+                              </label>
+                              <div className="flex items-end text-xs text-gray-500">{prodVariants.length} option{prodVariants.length === 1 ? '' : 's'}</div>
+                            </div>
+                            <div className="space-y-2">
+                              {prodVariants.map((variant, index) => {
+                                const availableImages = [...new Set([variant.image, ...prodImages].filter((image): image is string => Boolean(image)))];
+                                return (
+                                  <div key={`${variant.label || 'option'}-${index}`} className="space-y-3 rounded-lg border border-gray-100 bg-white p-3">
+                                    <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_8rem_auto] sm:items-end">
+                                      <label className="text-xs font-medium text-gray-600">
+                                        Option label
+                                        <Input
+                                          className="mt-1"
+                                          placeholder={prodVariantType === 'size' ? 'e.g. 1/2 inch' : prodVariantType === 'color' ? 'e.g. Matte black' : 'e.g. Premium'}
+                                          aria-label={`Label for option ${index + 1}`}
+                                          value={String(variant.label ?? '')}
+                                          onChange={(e) => handleVariantChange(index, 'label', e.target.value)}
+                                          required
+                                        />
+                                      </label>
+                                      <label className="text-xs font-medium text-gray-600">
+                                        Price (₹)
+                                        <Input
+                                          className="mt-1"
+                                          type="number"
+                                          min="0.01"
+                                          step="0.01"
+                                          aria-label={`Price for ${variant.label || `option ${index + 1}`}`}
+                                          value={String(variant.price ?? '')}
+                                          onChange={(e) => handleVariantChange(index, 'price', e.target.value)}
+                                          required
+                                        />
+                                      </label>
+                                      <div className="flex gap-2 sm:pb-0.5">
+                                        <Button type="button" variant={variant.is_default ? 'default' : 'outline'} onClick={() => setDefaultProductVariant(index)} className="flex-1 sm:flex-none" aria-pressed={Boolean(variant.is_default)}>
+                                          {variant.is_default ? 'Default' : 'Make default'}
+                                        </Button>
+                                        <Button type="button" variant="ghost" size="icon" onClick={() => removeProductVariant(index)} aria-label={`Remove option ${variant.label || index + 1}`} className="shrink-0 text-red-600 hover:bg-red-50 hover:text-red-700">
+                                          <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                      </div>
+                                    </div>
+                                    {availableImages.length > 0 && (
+                                      <label className="block text-xs font-medium text-gray-600">
+                                        Option image
+                                        <select
+                                          className="mt-1 flex h-10 w-full rounded-md border border-input bg-white px-3 py-2 text-sm text-gray-900"
+                                          aria-label={`Image for ${variant.label || `option ${index + 1}`}`}
+                                          value={variant.image || ''}
+                                          onChange={(e) => handleVariantChange(index, 'image', e.target.value)}
+                                        >
+                                          <option value="">Use product image</option>
+                                          {availableImages.map((image) => <option key={image} value={image}>{image.split('/').pop()}</option>)}
+                                        </select>
+                                      </label>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                            <p className="text-xs font-medium text-primary">Starting price: {lowestVariantPrice === null ? 'Enter valid option prices' : `₹${lowestVariantPrice.toLocaleString('en-IN')}`}</p>
+                          </>
+                        ) : (
+                          <Input type="number" min="0.01" step="0.01" placeholder="Price (₹)" value={prodPrice} onChange={(e) => setProdPrice(e.target.value)} required />
+                        )}
+                      </div>
                       <Input type="number" min="0" placeholder="Stock" value={prodStock} onChange={(e) => setProdStock(e.target.value)} required />
                       <div className="flex items-center justify-between rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5">
                         <div>
