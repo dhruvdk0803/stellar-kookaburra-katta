@@ -12,14 +12,19 @@ const Contact = () => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // Mock submit
-    console.log('Form submitted:', formData);
+    const inquiry = [
+      'Hello Katta Interiors, I have a product inquiry.',
+      `Name: ${formData.name}`,
+      `Email: ${formData.email}`,
+      `Phone: ${formData.phone}`,
+      `Message: ${formData.message}`,
+    ].join('\n');
+    window.open(`https://wa.me/918005708058?text=${encodeURIComponent(inquiry)}`, '_blank', 'noopener,noreferrer');
     setSubmitted(true);
-    setFormData({ name: '', email: '', phone: '', message: '' });
   };
 
   const handleWhatsApp = () => {
-    window.open('https://wa.me/918005708058?text=Inquiry from Katta Interiors website', '_blank');
+    window.open('https://wa.me/918005708058?text=Inquiry from Katta Interiors website', '_blank', 'noopener,noreferrer');
   };
 
   return (
@@ -30,39 +35,58 @@ const Contact = () => {
           <div>
             <h1 className="text-4xl font-playfair font-bold text-gray-900 mb-8">Contact Us</h1>
             <form onSubmit={handleSubmit} className="space-y-6">
-              <Input
-                placeholder="Your Name"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                required
-              />
-              <Input
-                type="email"
-                placeholder="Your Email"
-                value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                required
-              />
-              <Input
-                type="tel"
-                placeholder="Your Phone"
-                value={formData.phone}
-                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                required
-              />
-              <Textarea
-                placeholder="Your Message"
-                value={formData.message}
-                onChange={(e) => setFormData({ ...formData, message: e.target.value })}
-                rows={5}
-                required
-              />
+              <div className="space-y-2">
+                <label htmlFor="contact-name" className="block text-sm font-medium text-gray-700">Your Name</label>
+                <Input
+                  id="contact-name"
+                  autoComplete="name"
+                  placeholder="Your Name"
+                  value={formData.name}
+                  onChange={(e) => { setFormData({ ...formData, name: e.target.value }); setSubmitted(false); }}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <label htmlFor="contact-email" className="block text-sm font-medium text-gray-700">Email</label>
+                <Input
+                  id="contact-email"
+                  autoComplete="email"
+                  type="email"
+                  placeholder="Your Email"
+                  value={formData.email}
+                  onChange={(e) => { setFormData({ ...formData, email: e.target.value }); setSubmitted(false); }}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <label htmlFor="contact-phone" className="block text-sm font-medium text-gray-700">Phone</label>
+                <Input
+                  id="contact-phone"
+                  autoComplete="tel"
+                  type="tel"
+                  placeholder="Your Phone"
+                  value={formData.phone}
+                  onChange={(e) => { setFormData({ ...formData, phone: e.target.value }); setSubmitted(false); }}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <label htmlFor="contact-message" className="block text-sm font-medium text-gray-700">How can we help?</label>
+                <Textarea
+                  id="contact-message"
+                  placeholder="Your Message"
+                  value={formData.message}
+                  onChange={(e) => { setFormData({ ...formData, message: e.target.value }); setSubmitted(false); }}
+                  rows={5}
+                  required
+                />
+              </div>
               <Button type="submit" className="w-full rounded-full bg-primary hover:bg-primary/90 text-primary-foreground">
                 <Send className="mr-2 h-5 w-5" />
                 Send Message
               </Button>
             </form>
-            {submitted && <p className="text-green-600 mt-4">Thank you! We'll get back to you soon.</p>}
+            {submitted && <p className="mt-4 text-sm text-green-700" role="status" aria-live="polite">WhatsApp is ready with your inquiry. Review the details and tap Send to contact our team.</p>}
           </div>
 
           <div className="space-y-6">
@@ -79,11 +103,11 @@ const Contact = () => {
                 </div>
                 <div className="flex items-center">
                   <Phone className="h-5 w-5 text-primary mr-3" />
-                  <span>+91 8005708058</span>
+                  <a href="tel:+918005708058" className="hover:text-primary">+91 8005708058</a>
                 </div>
                 <div className="flex items-center">
                   <Mail className="h-5 w-5 text-primary mr-3" />
-                  <span>kattainterior@gmail.com</span>
+                  <a href="mailto:kattainterior@gmail.com" className="break-all hover:text-primary">kattainterior@gmail.com</a>
                 </div>
               </div>
             </div>
