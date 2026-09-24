@@ -10,7 +10,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/co
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Filter, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { filterNonEmptyCategories } from '@/lib/categories';
+import { filterNonEmptyCategories, productBrowsingCategories } from '@/lib/categories';
 
 // Fetch all active products with pagination. PostgREST caps any single
 // request at 1000 rows regardless of the requested limit, so the catalog
@@ -138,7 +138,7 @@ const Shop = () => {
     return searchMatchedProducts.filter((product) => selectedBrands.has(normalizeFilterValue(product.brands?.slug)));
   }, [filters.brand, searchMatchedProducts]);
   const visibleCategories = React.useMemo(
-    () => filterNonEmptyCategories(categories, categoryFacetProducts.map((product) => product.category_id)),
+    () => productBrowsingCategories(filterNonEmptyCategories(categories, categoryFacetProducts.map((product) => product.category_id))),
     [categories, categoryFacetProducts],
   );
   const availableBrands = React.useMemo(() => {

@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { useCart } from '@/contexts/CartContext';
 import { supabase } from '@/integrations/supabase/client';
-import { filterNonEmptyCategories } from '@/lib/categories';
+import { filterNonEmptyCategories, productBrowsingCategories } from '@/lib/categories';
 
 const navItems = [
   { label: 'Home', path: '/' },
@@ -47,14 +47,22 @@ const Navigation = () => {
         .order('name');
 
       if (!cardRes.error && cardRes.data) {
-        const stocked = cardRes.data;
-        const mainCats = stocked.filter(c => c.id === c.root_id);
+        const stocked = productBrowsingCategories(cardRes.data);
+        const mainCats = stocked.filter(c => !c.parent_id);
         const grouped: { [key: string]: { root: any; children: any[] } } = {};
         
         mainCats.forEach(mc => {
           grouped[mc.name] = {
             root: mc,
-            children: stocked.filter(c => c.root_id === mc.id && c.id !== mc.id),
+            children: stocked.filter((category) => {
+              let current = category;
+              let guard = 0;
+              while (current?.parent_id && guard++ < 20) {
+                if (current.parent_id === mc.id) return true;
+                current = stocked.find((candidate) => candidate.id === current.parent_id);
+              }
+              return false;
+            }),
           };
         });
         
@@ -69,7 +77,7 @@ const Navigation = () => {
           if (page.data.length < 1000) break;
         }
         if (!catRes.error && catRes.data) {
-          const stocked = filterNonEmptyCategories(catRes.data, productCategoryIds);
+          const stocked = productBrowsingCategories(filterNonEmptyCategories(catRes.data, productCategoryIds));
           const mainCats = stocked.filter((category) => !category.parent_id);
           const grouped: { [key: string]: { root: any; children: any[] } } = {};
           mainCats.forEach((root) => {

@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { ArrowRight, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
-import { filterNonEmptyCategories } from '@/lib/categories';
+import { filterNonEmptyCategories, productBrowsingCategories } from '@/lib/categories';
 
 const CategoryHighlights = () => {
   const [categories, setCategories] = useState<any[]>([]);
@@ -18,10 +18,10 @@ const CategoryHighlights = () => {
         supabase.from('products').select('category_id').eq('is_active', true),
       ]);
 
-      const stocked = filterNonEmptyCategories(
+      const stocked = productBrowsingCategories(filterNonEmptyCategories(
         catRes.data || [],
         (prodRes.data || []).map((p) => p.category_id),
-      );
+      ));
 
       setCategories(stocked.filter((c) => !c.parent_id).slice(0, 4));
       setLoading(false);

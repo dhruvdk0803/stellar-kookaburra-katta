@@ -178,8 +178,8 @@ const HomeCatalogPremium = () => {
           </div>
           <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-7">
             {brands.slice(0, 7).map((brand) => (
-              <Link key={brand.id} to={brandShopUrl(brand.slug)} className="flex h-20 items-center justify-center rounded-xl border border-[#e3dfd6] bg-white p-4 transition hover:-translate-y-0.5 hover:border-[#b9ad98]">
-                {brand.logo_url ? <img src={brand.logo_url} alt={brand.name} loading="lazy" className="max-h-10 w-full object-contain" /> : <span className="text-sm font-semibold text-[#17201d]">{brand.name}</span>}
+              <Link key={brand.id} to={brandShopUrl(brand.slug)} className="flex h-24 items-center justify-center rounded-xl border border-[#d8d2c7] bg-white p-3 shadow-sm transition hover:-translate-y-0.5 hover:border-[#9b8e78] hover:shadow-md">
+                {brand.logo_url ? <img src={brand.logo_url} alt={`${brand.name} logo`} loading="lazy" className="max-h-14 w-full object-contain" /> : <span className="text-sm font-semibold text-[#17201d]">{brand.name}</span>}
               </Link>
             ))}
           </div>
