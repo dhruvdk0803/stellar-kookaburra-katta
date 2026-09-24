@@ -103,7 +103,7 @@ const ProductDetail = () => {
       // Fetch Reviews
       const { data: revData } = await supabase
         .from('reviews')
-        .select('*, profiles(name)')
+        .select('id, product_id, rating, comment, created_at')
         .eq('product_id', id)
         .order('created_at', { ascending: false });
         
@@ -137,7 +137,7 @@ const ProductDetail = () => {
         rating: newRating,
         comment: newComment
       }])
-      .select('*, profiles(name)')
+      .select('id, product_id, rating, comment, created_at')
       .single();
 
     setIsSubmittingReview(false);
