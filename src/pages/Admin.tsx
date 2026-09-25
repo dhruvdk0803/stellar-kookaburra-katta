@@ -18,6 +18,7 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { ensureBrandPrefix, stripKnownBrandPrefix } from '@/lib/catalog';
 
 type ProductVariant = {
+  _editorKey?: string;
   label?: string;
   price?: number | string;
   image?: string;
@@ -30,6 +31,8 @@ const parsePrice = (value: unknown) => {
   if (typeof value === 'string' && value.trim() === '') return Number.NaN;
   return Number(value);
 };
+
+const createVariantEditorKey = () => globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`;
 
 const getErrorMessage = (error: unknown) => {
   if (error instanceof Error) return error.message;
@@ -355,14 +358,18 @@ const Admin = () => {
       return;
     }
     const defaultIndex = prodVariants.findIndex((variant) => variant.is_default);
-    const variants = prodVariants.map((variant, index) => ({
-      ...variant,
-      label: variantLabels[index],
-      price: variantPrices[index],
-      type: prodVariantType,
-      image: variant.image || undefined,
-      is_default: index === (defaultIndex >= 0 ? defaultIndex : 0),
-    }));
+    const variants = prodVariants.map((variant, index) => {
+      const savedVariant = { ...variant };
+      delete savedVariant._editorKey;
+      return {
+        ...savedVariant,
+        label: variantLabels[index],
+        price: variantPrices[index],
+        type: prodVariantType,
+        image: variant.image || undefined,
+        is_default: index === (defaultIndex >= 0 ? defaultIndex : 0),
+      };
+    });
     const enteredPrice = parsePrice(prodPrice);
 
     if (!hasVariants && (!Number.isFinite(enteredPrice) || enteredPrice <= 0)) {
@@ -415,7 +422,7 @@ const Admin = () => {
       Array.isArray(product.variants)
         ? product.variants
           .filter((variant: unknown) => variant && typeof variant === 'object' && !Array.isArray(variant))
-          .map((variant: ProductVariant) => ({ ...variant, price: variant.price ?? '' }))
+          .map((variant: ProductVariant) => ({ ...variant, _editorKey: createVariantEditorKey(), price: variant.price ?? '' }))
         : []
     );
     const savedVariantType = Array.isArray(product.variants)
@@ -434,7 +441,9 @@ const Admin = () => {
   };
 
   const addProductVariant = () => {
+    const editorKey = createVariantEditorKey();
     setProdVariants((variants) => [...variants, {
+      _editorKey: editorKey,
       label: '',
       price: '',
       type: prodVariantType,
@@ -842,7 +851,7 @@ const Admin = () => {
                                   ? `₹${optionPrice.toLocaleString('en-IN')}`
                                   : 'Price not set';
                                 return (
-                                  <div key={`${variant.label || 'option'}-${index}`} className="min-w-0 space-y-3 rounded-lg border border-gray-200 bg-white p-3 sm:p-4">
+                                  <div key={variant._editorKey ?? index} className="min-w-0 space-y-3 rounded-lg border border-gray-200 bg-white p-3 sm:p-4">
                                     <div className="flex min-w-0 items-start justify-between gap-3 border-b border-gray-100 pb-3">
                                       <div className="min-w-0">
                                         <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Option {index + 1}</p>
