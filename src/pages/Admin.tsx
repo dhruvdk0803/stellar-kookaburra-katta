@@ -811,7 +811,7 @@ const Admin = () => {
                         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                           <div>
                             <p className="text-sm font-semibold text-gray-800">Product options</p>
-                            <p className="text-xs text-gray-600">Add sizes, colours, finishes, or other choices. Each option can have its own price and product image.</p>
+                            <p className="text-xs text-gray-600">Enter each size or option with its price in the same card. The storefront will show this exact size–price pair.</p>
                           </div>
                           <Button type="button" variant="outline" onClick={addProductVariant} className="shrink-0 bg-white">Add option</Button>
                         </div>
@@ -836,41 +836,58 @@ const Admin = () => {
                             <div className="space-y-2">
                               {prodVariants.map((variant, index) => {
                                 const availableImages = [...new Set([variant.image, ...prodImages].filter((image): image is string => Boolean(image)))];
+                                const optionLabel = String(variant.label ?? '').trim();
+                                const optionPrice = parsePrice(variant.price);
+                                const priceSummary = Number.isFinite(optionPrice) && optionPrice > 0
+                                  ? `₹${optionPrice.toLocaleString('en-IN')}`
+                                  : 'Price not set';
                                 return (
-                                  <div key={`${variant.label || 'option'}-${index}`} className="space-y-3 rounded-lg border border-gray-100 bg-white p-3">
-                                    <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_8rem_auto] sm:items-end">
-                                      <label className="text-xs font-medium text-gray-600">
-                                        Option label
+                                  <div key={`${variant.label || 'option'}-${index}`} className="min-w-0 space-y-3 rounded-lg border border-gray-200 bg-white p-3 sm:p-4">
+                                    <div className="flex min-w-0 items-start justify-between gap-3 border-b border-gray-100 pb-3">
+                                      <div className="min-w-0">
+                                        <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Option {index + 1}</p>
+                                        <p className="mt-1 break-words text-sm font-semibold text-gray-900">
+                                          {optionLabel || (prodVariantType === 'size' ? 'Size not entered' : 'Option name not entered')}
+                                          <span className="mx-2 text-gray-400">·</span>
+                                          <span className={Number.isFinite(optionPrice) && optionPrice > 0 ? 'text-primary' : 'text-amber-700'}>{priceSummary}</span>
+                                        </p>
+                                      </div>
+                                      {variant.is_default && <span className="shrink-0 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary">Default price</span>}
+                                    </div>
+                                    <div className="grid min-w-0 gap-3 sm:grid-cols-2">
+                                      <label className="min-w-0 text-xs font-semibold text-gray-700">
+                                        {prodVariantType === 'size' ? 'Size' : prodVariantType === 'color' ? 'Colour name' : prodVariantType === 'finish' ? 'Finish name' : 'Option name'}
                                         <Input
                                           className="mt-1"
-                                          placeholder={prodVariantType === 'size' ? 'e.g. 1/2 inch' : prodVariantType === 'color' ? 'e.g. Matte black' : 'e.g. Premium'}
+                                          placeholder={prodVariantType === 'size' ? 'e.g. 1/2 inch or 25 mm' : prodVariantType === 'color' ? 'e.g. Matte black' : prodVariantType === 'finish' ? 'e.g. Brushed brass' : 'e.g. Premium'}
                                           aria-label={`Label for option ${index + 1}`}
                                           value={String(variant.label ?? '')}
                                           onChange={(e) => handleVariantChange(index, 'label', e.target.value)}
                                           required
                                         />
                                       </label>
-                                      <label className="text-xs font-medium text-gray-600">
-                                        Price (₹)
+                                      <label className="min-w-0 text-xs font-semibold text-gray-700">
+                                        Price for this option (₹)
                                         <Input
                                           className="mt-1"
                                           type="number"
                                           min="0.01"
                                           step="0.01"
+                                          placeholder="e.g. 580"
                                           aria-label={`Price for ${variant.label || `option ${index + 1}`}`}
                                           value={String(variant.price ?? '')}
                                           onChange={(e) => handleVariantChange(index, 'price', e.target.value)}
                                           required
                                         />
                                       </label>
-                                      <div className="flex gap-2 sm:pb-0.5">
-                                        <Button type="button" variant={variant.is_default ? 'default' : 'outline'} onClick={() => setDefaultProductVariant(index)} className="flex-1 sm:flex-none" aria-pressed={Boolean(variant.is_default)}>
-                                          {variant.is_default ? 'Default' : 'Make default'}
-                                        </Button>
-                                        <Button type="button" variant="ghost" size="icon" onClick={() => removeProductVariant(index)} aria-label={`Remove option ${variant.label || index + 1}`} className="shrink-0 text-red-600 hover:bg-red-50 hover:text-red-700">
-                                          <Trash2 className="h-4 w-4" />
-                                        </Button>
-                                      </div>
+                                    </div>
+                                    <div className="flex flex-wrap items-center justify-between gap-2 border-t border-gray-100 pt-3">
+                                      <Button type="button" variant={variant.is_default ? 'default' : 'outline'} onClick={() => setDefaultProductVariant(index)} className="min-h-10" aria-pressed={Boolean(variant.is_default)}>
+                                        {variant.is_default ? 'Default price' : 'Set as default price'}
+                                      </Button>
+                                      <Button type="button" variant="ghost" onClick={() => removeProductVariant(index)} aria-label={`Remove option ${variant.label || index + 1}`} className="min-h-10 text-red-600 hover:bg-red-50 hover:text-red-700">
+                                        <Trash2 className="mr-2 h-4 w-4" /> Remove option
+                                      </Button>
                                     </div>
                                     {availableImages.length > 0 && (
                                       <label className="block text-xs font-medium text-gray-600">
