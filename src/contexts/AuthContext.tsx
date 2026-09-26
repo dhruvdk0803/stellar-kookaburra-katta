@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -32,18 +32,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const activeUserId = useRef<string | null>(null);
 
   useEffect(() => {
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    let receivedAuthEvent = false;
+    const applySession = (session: Session | null) => {
+      activeUserId.current = session?.user.id || null;
       setSession(session);
       setUser(session?.user ?? null);
-      if (session?.user) fetchProfile(session.user.id);
-      else setIsLoading(false);
+      setProfile(null);
+      setIsLoading(Boolean(session?.user));
+      if (session?.user) void fetchProfile(session.user.id);
+    };
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!receivedAuthEvent) applySession(session);
+    }).catch(() => {
+      if (!receivedAuthEvent) applySession(null);
     });
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      receivedAuthEvent = true;
       
       // INTERCEPT PASSWORD RECOVERY
       if (event === 'PASSWORD_RECOVERY') {
@@ -53,14 +63,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return;
       }
 
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        fetchProfile(session.user.id);
-      } else {
-        setProfile(null);
-        setIsLoading(false);
-      }
+      applySession(session);
     });
 
     return () => subscription.unsubscribe();
@@ -74,13 +77,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .eq('id', userId)
         .single();
       
-      if (!error && data) {
+      if (activeUserId.current === userId && !error && data) {
         setProfile(data as Profile);
       }
     } catch (error) {
       console.error('Error fetching profile:', error);
     } finally {
-      setIsLoading(false);
+      if (activeUserId.current === userId) setIsLoading(false);
     }
   };
 

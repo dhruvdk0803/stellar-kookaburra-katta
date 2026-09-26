@@ -16,6 +16,7 @@ import { ThemeSupa } from '@supabase/auth-ui-shared';
 import { Loader2, LogOut, Package, Tags, ShoppingBag, Edit2, Trash2, X, DollarSign, Activity, LayoutDashboard, ChevronDown, ChevronUp, Upload, Image as ImageIcon, FileSpreadsheet, Wrench } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
 import { ensureBrandPrefix, stripKnownBrandPrefix } from '@/lib/catalog';
+import { getSavedVariantImage } from '@/lib/productImages';
 
 type ProductVariant = {
   _editorKey?: string;
@@ -53,8 +54,13 @@ interface ProductCategoryAssignment {
 }
 
 const uploadCatalogImage = async (file: File, folder: 'products' | 'categories' | 'brands') => {
-  if (!file.type.startsWith('image/')) throw new Error('Choose an image file.');
-  const extension = file.name.split('.').pop()?.toLowerCase().replace(/[^a-z0-9]/g, '') || 'image';
+  const extensions: Record<string, string> = {
+    'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp',
+    'image/avif': 'avif', 'image/gif': 'gif',
+  };
+  const extension = extensions[file.type];
+  if (!extension) throw new Error('Choose a JPG, PNG, WebP, AVIF, or GIF image.');
+  if (file.size === 0 || file.size > 10 * 1024 * 1024) throw new Error('Image must be between 1 byte and 10 MB.');
   const uniqueId = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
   const filePath = `${folder}/${uniqueId}.${extension}`;
   const { error } = await supabase.storage.from('product-images').upload(filePath, file, { cacheControl: '3600', upsert: false });
@@ -104,6 +110,27 @@ async function fetchAllAdminProducts(): Promise<any[]> {
   return allProducts;
 }
 
+async function fetchAllAdminOrders() {
+  const PAGE_SIZE = 250;
+  const allOrders = [];
+  for (let from = 0; ; from += PAGE_SIZE) {
+    const { data, error } = await supabase.from('orders')
+      .select('*, profiles(name), order_items(*, products(name, image_url, images))')
+      .order('created_at', { ascending: false })
+      .order('id', { ascending: false })
+      .range(from, from + PAGE_SIZE - 1);
+    if (error) throw error;
+    if (!data?.length) break;
+    allOrders.push(...data);
+    if (data.length < PAGE_SIZE) break;
+  }
+  return allOrders;
+}
+
+const countsAsRevenue = (order: { status: string; payment_provider?: string | null; payment_status?: string | null }) =>
+  ['confirmed', 'processing', 'shipped', 'delivered'].includes(order.status) &&
+  (order.payment_provider !== 'razorpay' || order.payment_status === 'captured');
+
 const Admin = () => {
   const { user, profile, isLoading, signOut } = useAuth();
   const navigate = useNavigate();
@@ -146,8 +173,13 @@ const Admin = () => {
   const [prodVariants, setProdVariants] = useState<ProductVariant[]>([]);
   const [prodVariantType, setProdVariantType] = useState('size');
   const [isUploadingImages, setIsUploadingImages] = useState(false);
+  const [isSavingProduct, setIsSavingProduct] = useState(false);
   const [isUploadingBulk, setIsUploadingBulk] = useState(false);
   const [isFixingDescriptions, setIsFixingDescriptions] = useState(false);
+  const [listBrand, setListBrand] = useState('');
+  const [listCategory, setListCategory] = useState('');
+  const [listStatus, setListStatus] = useState('all');
+  const [listSearch, setListSearch] = useState('');
 
   useEffect(() => {
     if (profile?.role === 'admin') {
@@ -156,16 +188,22 @@ const Admin = () => {
   }, [profile]);
 
   const fetchData = async () => {
-    const [catRes, brandRes, prodRes, ordRes] = await Promise.all([
+    try {
+      const [catRes, brandRes, prodRes, ordRes] = await Promise.all([
       supabase.from('categories').select('*, parent:parent_id(name)').order('created_at', { ascending: false }),
       supabase.from('brands').select('*').order('display_order').order('name'),
       fetchAllAdminProducts(),
-      supabase.from('orders').select('*, profiles(name), order_items(*, products(name, image_url, images))').order('created_at', { ascending: false })
+      fetchAllAdminOrders()
     ]);
-    if (catRes.data) setCategories(catRes.data);
-    if (brandRes.data) setBrands(brandRes.data);
-    setProducts(prodRes);
-    if (ordRes.data) setOrders(ordRes.data);
+      if (catRes.error) throw catRes.error;
+      if (brandRes.error) throw brandRes.error;
+      setCategories(catRes.data || []);
+      setBrands(brandRes.data || []);
+      setProducts(prodRes);
+      setOrders(ordRes);
+    } catch (error) {
+      toast.error(`Could not load admin data: ${getErrorMessage(error)}`);
+    }
   };
 
   // --- Chart Data Processing ---
@@ -180,10 +218,10 @@ const Admin = () => {
     }).reverse();
 
     return days.map(date => {
-      const dayOrders = orders.filter(o => o.created_at.startsWith(date) && o.status !== 'cancelled');
+      const dayOrders = orders.filter(o => o.created_at.startsWith(date) && countsAsRevenue(o));
       return {
         date: new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-        revenue: dayOrders.reduce((sum, o) => sum + o.total_amount, 0),
+        revenue: dayOrders.reduce((sum, o) => sum + Number(o.total_amount), 0),
         orders: dayOrders.length
       };
     });
@@ -321,11 +359,18 @@ const Admin = () => {
   };
 
   const removeImage = (indexToRemove: number) => {
+    const removed = prodImages[indexToRemove];
     setProdImages(prev => prev.filter((_, index) => index !== indexToRemove));
+    setProdVariants(prev => prev.map(variant => variant.image === removed ? { ...variant, image: undefined } : variant));
+  };
+
+  const setPrimaryImage = (indexToMove: number) => {
+    setProdImages(prev => [prev[indexToMove], ...prev.filter((_, index) => index !== indexToMove)]);
   };
 
   const handleSaveProduct = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSavingProduct || isUploadingImages) return;
     const selectedBrand = brands.find((brand) => brand.id === prodBrand);
     if (!selectedBrand) { toast.error('Select a valid brand.'); return; }
     if (!(showAllProductCategories ? categories : getCategoriesForBrand(categories, products, selectedBrand.id)).some((category) => category.id === prodCat)) {
@@ -366,7 +411,7 @@ const Admin = () => {
         label: variantLabels[index],
         price: variantPrices[index],
         type: prodVariantType,
-        image: variant.image || undefined,
+        image: getSavedVariantImage(variant.image, prodImages),
         is_default: index === (defaultIndex >= 0 ? defaultIndex : 0),
       };
     });
@@ -393,14 +438,19 @@ const Admin = () => {
       variants
     };
 
-    if (editingProductId) {
-      const { error } = await supabase.from('products').update(productData).eq('id', editingProductId);
-      if (error) toast.error(error.message);
-      else { toast.success('Product updated!'); resetProductForm(); fetchData(); }
-    } else {
-      const { error } = await supabase.from('products').insert([productData]);
-      if (error) toast.error(error.message);
-      else { toast.success('Product added!'); resetProductForm(); fetchData(); }
+    setIsSavingProduct(true);
+    try {
+      const { error } = editingProductId
+        ? await supabase.from('products').update(productData).eq('id', editingProductId)
+        : await supabase.from('products').insert([productData]);
+      if (error) throw error;
+      toast.success(editingProductId ? 'Product updated!' : 'Product added!');
+      resetProductForm();
+      await fetchData();
+    } catch (error) {
+      toast.error(`Could not save product: ${getErrorMessage(error)}`);
+    } finally {
+      setIsSavingProduct(false);
     }
   };
 
@@ -415,9 +465,14 @@ const Admin = () => {
     setProdStock(product.stock?.toString() || '0');
     setProdIsActive(product.is_active !== false);
     
-    let imgs = product.images || [];
+    let imgs = Array.isArray(product.images) ? product.images : [];
     if (imgs.length === 0 && product.image_url) imgs = [product.image_url];
-    setProdImages(imgs);
+    // Older catalog rows may keep option photos outside the gallery. Surface
+    // them here so an admin can keep or remove them deliberately.
+    const variantImages = Array.isArray(product.variants)
+      ? product.variants.map((variant: ProductVariant) => variant?.image).filter((image: unknown): image is string => typeof image === 'string' && Boolean(image))
+      : [];
+    setProdImages([...new Set([...imgs, ...variantImages])]);
     setProdVariants(
       Array.isArray(product.variants)
         ? product.variants
@@ -448,7 +503,7 @@ const Admin = () => {
       price: '',
       type: prodVariantType,
       is_default: variants.length === 0,
-      image: prodImages[0] || undefined,
+      image: undefined,
     }]);
   };
 
@@ -605,9 +660,35 @@ const Admin = () => {
     );
   }
 
-  const totalRevenue = orders.filter(o => o.status !== 'cancelled').reduce((sum, o) => sum + o.total_amount, 0);
+  const totalRevenue = orders.filter(countsAsRevenue).reduce((sum, o) => sum + Number(o.total_amount), 0);
   const activeProductCount = products.filter((product) => product.is_active !== false).length;
   const productCategoryOptions = prodBrand && !showAllProductCategories ? getCategoriesForBrand(categories, products, prodBrand) : categories;
+  const listCategoryOptions = useMemo(() => {
+    if (!listBrand) return categories;
+    if (!products.some((product) => product.brand_id === listBrand)) return [];
+    return getCategoriesForBrand(categories, products, listBrand);
+  }, [categories, products, listBrand]);
+  const matchingProducts = useMemo(() => {
+    const search = listSearch.trim().toLocaleLowerCase();
+    const selectedCategory = categories.find((category) => category.id === listCategory);
+    const categoryMatches = (categoryId: string | null) => {
+      if (!selectedCategory) return !listCategory;
+      let current = categories.find((category) => category.id === categoryId);
+      let guard = 0;
+      while (current && guard++ < 20) {
+        if (current.id === selectedCategory.id) return true;
+        current = categories.find((category) => category.id === current.parent_id);
+      }
+      return false;
+    };
+
+    return products.filter((product) =>
+      (!listBrand || product.brand_id === listBrand) &&
+      (!listCategory || categoryMatches(product.category_id)) &&
+      (listStatus === 'all' || (product.is_active !== false) === (listStatus === 'live')) &&
+      (!search || String(product.name || '').toLocaleLowerCase().includes(search)),
+    );
+  }, [products, categories, listBrand, listCategory, listStatus, listSearch]);
   const hasProductVariants = prodVariants.length > 0;
   const validVariantPrices = prodVariants
     .map((variant) => parsePrice(variant.price))
@@ -725,19 +806,23 @@ const Admin = () => {
                             <td className="px-4 py-4 font-mono text-xs text-gray-600">{order.id.slice(0, 8)}</td>
                             <td className="px-4 py-4 font-medium text-gray-900">{order.profiles?.name || 'Unknown'}</td>
                             <td className="px-4 py-4 text-gray-600">{new Date(order.created_at).toLocaleDateString()}</td>
-                            <td className="px-4 py-4 font-bold text-primary">₹{order.total_amount.toFixed(2)}</td>
+                            <td className="px-4 py-4 font-bold text-primary">₹{Number(order.total_amount).toFixed(2)}</td>
                             <td className="px-4 py-4">
                               <select 
                                 className="text-sm border border-gray-200 rounded-md px-2 py-1.5 bg-white focus:ring-2 focus:ring-primary/20 outline-none"
                                 value={order.status}
                                 onChange={(e) => handleUpdateOrderStatus(order.id, e.target.value)}
                               >
-                                <option value="pending">Pending</option>
-                                <option value="processing">Processing</option>
-                                <option value="shipped">Shipped</option>
-                                <option value="delivered">Delivered</option>
-                                <option value="cancelled">Cancelled</option>
+                                {!order.payment_id && <option value="pending">Pending</option>}
+                                {(order.payment_provider !== 'razorpay' || order.payment_status === 'captured') && <>
+                                  <option value="confirmed">Confirmed</option>
+                                  <option value="processing">Processing</option>
+                                  <option value="shipped">Shipped</option>
+                                  <option value="delivered">Delivered</option>
+                                </>}
+                                {(order.payment_provider !== 'razorpay' || order.status === 'cancelled') && <option value="cancelled">Cancelled</option>}
                               </select>
+                              {order.inventory_issue && <div className="mt-1 text-xs font-semibold text-red-700">Check stock before fulfilment</div>}
                             </td>
                           </tr>
                           {expandedOrderId === order.id && (
@@ -844,7 +929,7 @@ const Admin = () => {
                             </div>
                             <div className="space-y-2">
                               {prodVariants.map((variant, index) => {
-                                const availableImages = [...new Set([variant.image, ...prodImages].filter((image): image is string => Boolean(image)))];
+                                const availableImages = prodImages;
                                 const optionLabel = String(variant.label ?? '').trim();
                                 const optionPrice = parsePrice(variant.price);
                                 const priceSummary = Number.isFinite(optionPrice) && optionPrice > 0
@@ -970,6 +1055,13 @@ const Admin = () => {
                             {prodImages.map((img, idx) => (
                               <div key={idx} className="relative group aspect-square rounded-md overflow-hidden border border-gray-200">
                                 <img src={img} alt={`Preview ${idx}`} className="w-full h-full object-cover" />
+                                {idx === 0 ? (
+                                  <span className="absolute bottom-1 left-1 rounded bg-white/90 px-1.5 py-0.5 text-[10px] font-semibold text-gray-800">Primary</span>
+                                ) : (
+                                  <button type="button" onClick={() => setPrimaryImage(idx)} className="absolute bottom-1 left-1 rounded bg-white/90 px-1.5 py-0.5 text-[10px] font-semibold text-gray-800 hover:bg-white" aria-label={`Make image ${idx + 1} primary`}>
+                                    Make primary
+                                  </button>
+                                )}
                                 <button 
                                   type="button"
                                   onClick={() => removeImage(idx)}
@@ -983,8 +1075,8 @@ const Admin = () => {
                         )}
                       </div>
 
-                      <Button type="submit" className="w-full rounded-full" disabled={isUploadingImages}>
-                        {editingProductId ? 'Update Product' : 'Add Product'}
+                      <Button type="submit" className="w-full rounded-full" disabled={isUploadingImages || isSavingProduct}>
+                        {isSavingProduct ? 'Saving...' : editingProductId ? 'Update Product' : 'Add Product'}
                       </Button>
                     </form>
                   </CardContent>
@@ -1029,8 +1121,39 @@ const Admin = () => {
               </div>
 
               <Card className="lg:col-span-2 border-0 shadow-sm">
-                <CardHeader><CardTitle>Product List ({products.length} total · {activeProductCount} live)</CardTitle></CardHeader>
+                <CardHeader><CardTitle>Product List ({matchingProducts.length} shown · {products.length} total · {activeProductCount} live)</CardTitle></CardHeader>
                 <CardContent>
+                  <div className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                    <div>
+                      <label htmlFor="product-list-search" className="mb-1 block text-xs font-medium text-gray-600">Search products</label>
+                      <Input id="product-list-search" placeholder="Product name" value={listSearch} onChange={(event) => setListSearch(event.target.value)} />
+                    </div>
+                    <div>
+                      <label htmlFor="product-list-brand" className="mb-1 block text-xs font-medium text-gray-600">Brand</label>
+                      <select id="product-list-brand" className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={listBrand} onChange={(event) => { setListBrand(event.target.value); setListCategory(''); }}>
+                        <option value="">All brands</option>
+                        {brands.map((brand) => <option key={brand.id} value={brand.id}>{brand.name}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label htmlFor="product-list-category" className="mb-1 block text-xs font-medium text-gray-600">Category</label>
+                      <select id="product-list-category" className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={listCategory} onChange={(event) => setListCategory(event.target.value)}>
+                        <option value="">All categories</option>
+                        {listCategoryOptions.map((category) => <option key={category.id} value={category.id}>{category.parent?.name ? `${category.parent.name} / ` : ''}{category.name}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label htmlFor="product-list-status" className="mb-1 block text-xs font-medium text-gray-600">Website status</label>
+                      <select id="product-list-status" className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={listStatus} onChange={(event) => setListStatus(event.target.value)}>
+                        <option value="all">All statuses</option>
+                        <option value="live">Live</option>
+                        <option value="draft">Draft</option>
+                      </select>
+                    </div>
+                  </div>
+                  {(listSearch || listBrand || listCategory || listStatus !== 'all') && (
+                    <Button type="button" variant="ghost" size="sm" className="mb-3" onClick={() => { setListSearch(''); setListBrand(''); setListCategory(''); setListStatus('all'); }}>Clear filters</Button>
+                  )}
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm text-left">
                       <thead className="text-xs text-gray-500 uppercase bg-gray-50">
@@ -1045,7 +1168,7 @@ const Admin = () => {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100">
-                        {products.map(product => {
+                        {matchingProducts.map(product => {
                           const img = (product.images && product.images.length > 0) ? product.images[0] : (product.image_url || '/placeholder.svg');
                           return (
                             <tr key={product.id} className="hover:bg-gray-50/50 transition-colors">
@@ -1075,6 +1198,9 @@ const Admin = () => {
                             </tr>
                           );
                         })}
+                        {matchingProducts.length === 0 && (
+                          <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-500">No products match these filters.</td></tr>
+                        )}
                       </tbody>
                     </table>
                   </div>

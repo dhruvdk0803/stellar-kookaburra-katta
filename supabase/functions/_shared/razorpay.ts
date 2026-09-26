@@ -40,6 +40,7 @@ export function razorpayFetch(path: string, init: RequestInit = {}) {
   const auth = btoa(`${keyId()}:${keySecret()}`);
   return fetch(`https://api.razorpay.com/v1${path}`, {
     ...init,
+    signal: init.signal ?? AbortSignal.timeout(10_000),
     headers: {
       Authorization: `Basic ${auth}`,
       "Content-Type": "application/json",

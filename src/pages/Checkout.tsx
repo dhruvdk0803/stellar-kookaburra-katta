@@ -73,6 +73,19 @@ const ensureRazorpayScript = () => {
   return razorpayScriptPromise;
 };
 
+const getFunctionErrorMessage = async (error: unknown): Promise<string> => {
+  const fallback = error instanceof Error ? error.message : 'Payment service is unavailable.';
+  const context = error && typeof error === 'object' && 'context' in error ? error.context : null;
+  if (!(context instanceof Response)) return fallback;
+  try {
+    const body: unknown = await context.json();
+    if (body && typeof body === 'object' && 'error' in body && typeof body.error === 'string') {
+      return body.error;
+    }
+  } catch { /* Use the fallback message when the response is not JSON. */ }
+  return fallback;
+};
+
 const Checkout = () => {
   const { cart, discountPercent } = useCart();
   const { user, isLoading } = useAuth();
@@ -111,12 +124,13 @@ const Checkout = () => {
         body: {
           items: cart.map((item) => ({ product_id: item.id, quantity: item.quantity })),
           discount_percent: discountPercent,
+          expected_total_paise: Math.round(total * 100),
           address: fullAddress,
           phone: formData.phone,
         },
       });
 
-      if (error) throw error;
+      if (error) throw new Error(await getFunctionErrorMessage(error));
       if (data?.error || !data?.rzpOrderId) {
         throw new Error(data?.error || 'Could not start Razorpay payment.');
       }
@@ -139,7 +153,7 @@ const Checkout = () => {
                 razorpay_signature: response.razorpay_signature,
               },
             });
-            if (verifyError) throw verifyError;
+            if (verifyError) throw new Error(await getFunctionErrorMessage(verifyError));
             // With automatic capture enabled this is normally already
             // confirmed. A short authorised-to-captured delay is handled by
             // the status page and its signed webhook fallback.

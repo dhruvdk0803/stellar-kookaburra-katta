@@ -182,6 +182,11 @@ const Account = () => {
                           <span className="text-sm font-medium capitalize text-gray-700">{order.status}</span>
                         </div>
                       </div>
+                      {order.inventory_issue && (
+                        <p className="mb-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-800">
+                          We are checking availability for part of this order and will contact you with an update.
+                        </p>
+                      )}
                       
                       <div className="divide-y divide-gray-50">
                         {order.order_items?.map((item: any) => (
@@ -207,7 +212,7 @@ const Account = () => {
                       
                       <div className="mt-4 pt-4 border-t border-gray-100 flex justify-between items-center">
                         <span className="text-gray-600">Total Amount</span>
-                        <span className="text-xl font-bold text-primary">₹{order.total_amount.toFixed(2)}</span>
+                        <span className="text-xl font-bold text-primary">₹{Number(order.total_amount).toFixed(2)}</span>
                       </div>
                     </div>
                   ))}

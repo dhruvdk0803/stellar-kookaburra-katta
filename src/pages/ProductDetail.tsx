@@ -16,6 +16,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { stripKnownBrandPrefix } from '@/lib/catalog';
 import { formatRupees } from '@/lib/money';
+import { getProductImages } from '@/lib/productImages';
 
 type ProductVariant = {
   label: string;
@@ -25,26 +26,9 @@ type ProductVariant = {
   type?: string;
 };
 
-// Fallbacks keep these finish choices available until the corresponding
-// catalog migration has been applied to an existing store database.
-const IMPERIA_COLOUR_VARIANTS: Record<string, ProductVariant[]> = {
-  'Imperia Digital Lock IM07 | IM08': [
-    { label: 'Black', price: 53198, image: '/images/ebco/ebco-10b.jpg', is_default: true, type: 'color' },
-    { label: 'Anthracite', price: 53198, image: '/images/ebco/ebco-10c.jpg', is_default: false, type: 'color' },
-  ],
-  'Imperia Digital Lock IM05 | IM06': [
-    { label: 'Black', price: 46525, image: '/images/ebco/ebco-11c.jpg', is_default: true, type: 'color' },
-    { label: 'Anthracite', price: 46525, image: '/images/ebco/ebco-11b.jpg', is_default: false, type: 'color' },
-  ],
-  'Imperia Digital Lock IM01 | IM02': [
-    { label: 'Black', price: 38100, image: '/images/ebco/ebco-13b.jpg', is_default: true, type: 'color' },
-    { label: 'Copper', price: 38100, image: '/images/ebco/ebco-13c.jpg', is_default: false, type: 'color' },
-  ],
-};
-
 const getProductVariants = (product: { name?: string; variants?: unknown }): ProductVariant[] => {
   const storedVariants = Array.isArray(product.variants) ? product.variants as ProductVariant[] : [];
-  return storedVariants.length > 0 ? storedVariants : IMPERIA_COLOUR_VARIANTS[product.name || ''] || [];
+  return storedVariants;
 };
 
 const ProductDetail = () => {
@@ -67,26 +51,34 @@ const ProductDetail = () => {
   const { isInWishlist, toggleWishlist } = useWishlist();
 
   useEffect(() => {
+    let current = true;
     const fetchProductAndReviews = async () => {
       if (!id) return;
       setLoading(true);
+      setProduct(null);
+      setRelatedProducts([]);
+      setReviews([]);
       
       // Fetch Product
-      const { data: prodData } = await supabase
+      const { data: prodData, error: productError } = await supabase
         .from('products')
         .select('*, categories(name, slug), brands(name, slug)')
         .eq('id', id)
         .single();
       
       // Drafted products (is_active = false) stay reachable by direct URL otherwise.
+      if (!current) return;
+      if (productError && productError.code !== 'PGRST116') toast.error('Could not load this product. Please try again.');
       if (prodData && prodData.is_active !== false) {
         setProduct(prodData);
         const vars = getProductVariants(prodData);
         const defIdx = vars.findIndex((v: any) => v.is_default);
-        const imgs = (prodData.images && prodData.images.length > 0) ? prodData.images : (prodData.image_url ? [prodData.image_url] : ['/placeholder.svg']);
+        const imgs = getProductImages(prodData);
         const selectedIdx = defIdx >= 0 ? defIdx : 0;
         setSelectedVariant(selectedIdx);
-        setSelectedImage(vars[selectedIdx]?.image || imgs[0]);
+        // The gallery's first image is the current catalog photo. A saved
+        // variant image is selected only when the shopper chooses that option.
+        setSelectedImage(imgs[0]);
         
         if (prodData.category_id) {
           const { data: related } = await supabase
@@ -96,7 +88,7 @@ const ProductDetail = () => {
             .neq('id', prodData.id)
             .eq('is_active', true)
             .limit(4);
-          if (related) setRelatedProducts(related);
+          if (current && related) setRelatedProducts(related);
         }
       }
 
@@ -107,14 +99,15 @@ const ProductDetail = () => {
         .eq('product_id', id)
         .order('created_at', { ascending: false });
         
-      if (revData) setReviews(revData);
+      if (current && revData) setReviews(revData);
 
-      setLoading(false);
+      if (current) setLoading(false);
     };
     
     fetchProductAndReviews();
     setQuantity(1);
     window.scrollTo(0, 0);
+    return () => { current = false; };
   }, [id]);
 
   const handleSubmitReview = async (e: React.FormEvent) => {
@@ -174,7 +167,7 @@ const ProductDetail = () => {
     );
   }
 
-  const allImages = (product.images && product.images.length > 0) ? product.images : (product.image_url ? [product.image_url] : ['/placeholder.svg']);
+  const allImages = getProductImages(product);
   const categoryName = product.categories?.name || product.subcategory || 'Uncategorized';
   // GST remains stored with the product for administration and order records, but
   // tax details are not displayed to customers on product pages.
@@ -317,7 +310,7 @@ const ProductDetail = () => {
                       key={idx}
                       onClick={() => {
                         setSelectedVariant(idx);
-                        if (v.image) setSelectedImage(v.image);
+                        setSelectedImage(v.image || allImages[0]);
                       }}
                       aria-pressed={selectedVariant === idx}
                       className={cn(

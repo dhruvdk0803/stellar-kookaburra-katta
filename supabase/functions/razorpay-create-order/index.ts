@@ -17,9 +17,11 @@ type ProductRow = {
   price: unknown;
   variants?: unknown;
   is_active: boolean;
+  stock: number | null;
 };
 
 type ProductVariant = {
+  label?: unknown;
   price?: unknown;
 };
 
@@ -46,17 +48,23 @@ Deno.serve(async (req) => {
     if (!requestBody || typeof requestBody !== "object") {
       return json({ error: "Invalid checkout request" }, 400);
     }
-    const { items, address, phone, discount_percent } = requestBody as {
+    const { items, address, phone, discount_percent, expected_total_paise } = requestBody as {
       items?: unknown;
       address?: unknown;
       phone?: unknown;
       discount_percent?: unknown;
+      expected_total_paise?: unknown;
     };
     if (!Array.isArray(items) || items.length === 0) {
       return json({ error: "Cart is empty" }, 400);
     }
-    if (!address || typeof address !== "string") {
-      return json({ error: "Address is required" }, 400);
+    if (items.length > 50) return json({ error: "Too many cart items" }, 400);
+    if (typeof address !== "string" || address.trim().length < 10 || address.length > 500) {
+      return json({ error: "Enter a valid shipping address" }, 400);
+    }
+    const phoneDigits = typeof phone === "string" ? phone.replace(/\D/g, "") : "";
+    if (phoneDigits.length !== 10) {
+      return json({ error: "Enter a valid 10-digit phone number" }, 400);
     }
     const discountPercent = Number(discount_percent ?? 0);
     if (!Number.isInteger(discountPercent) || discountPercent < 0 || discountPercent > 5) {
@@ -71,29 +79,35 @@ Deno.serve(async (req) => {
     // Cart item ids may carry a variant suffix ("<product-id>:v<index>") when
     // the shopper picked a size on the product page; the base UUID always
     // resolves to a real product.
-    const baseIds = [
-      ...new Set(items.map((item: CartRequestItem) => {
-        if (typeof item.product_id !== "string") return "";
-        return item.product_id.split(":v")[0];
-      })),
-    ];
+    const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const baseIds = [...new Set(items.map((item: CartRequestItem) => {
+      if (typeof item.product_id !== "string" || !uuidPattern.test(item.product_id.split(":v")[0])) return "";
+      return item.product_id.split(":v")[0];
+    }))];
     if (baseIds.includes("")) return json({ error: "Invalid cart item" }, 400);
     const { data: products, error: prodErr } = await admin
       .from("products")
-      .select("id, price, variants, is_active")
+      .select("id, price, variants, is_active, stock")
       .in("id", baseIds);
     if (prodErr) throw prodErr;
 
     const productRows = (products || []) as unknown as ProductRow[];
     const productMap = new Map(productRows.map((product) => [product.id, product]));
-    let subtotal = 0;
-    const orderItems: Array<{ product_id: string; quantity: number; price: number }> = [];
+    let subtotalPaise = 0;
+    const quantitiesByProduct = new Map<string, number>();
+    const orderItems: Array<{
+      product_id: string;
+      quantity: number;
+      price: number;
+      variant_label: string | null;
+    }> = [];
     for (const item of items as CartRequestItem[]) {
       if (typeof item.product_id !== "string") {
         return json({ error: "Invalid cart item" }, 400);
       }
       const rawId = item.product_id;
-      const vMatch = rawId.match(/^(.+):v(\d+)$/);
+      const vMatch = rawId.match(/^([0-9a-f-]{36}):v(\d+)$/i);
+      if (!uuidPattern.test(rawId) && !vMatch) return json({ error: "Invalid cart item" }, 400);
       const pid = vMatch ? vMatch[1] : rawId;
       const product = productMap.get(pid);
       if (!product || !product.is_active) {
@@ -101,6 +115,7 @@ Deno.serve(async (req) => {
       }
       // Price comes from the DB variant when one was selected, never the client.
       let price = Number(product.price);
+      let variantLabel: string | null = null;
       if (vMatch) {
         const variant = (Array.isArray(product.variants)
           ? product.variants as ProductVariant[]
@@ -110,21 +125,38 @@ Deno.serve(async (req) => {
           return json({ error: `Invalid variant for ${pid}` }, 400);
         }
         price = Number(variant.price ?? product.price);
+        variantLabel = typeof variant.label === "string" ? variant.label : null;
       }
       if (!Number.isFinite(price) || price <= 0) {
         return json({ error: `Invalid price for ${pid}` }, 400);
       }
       const qty = Number(item.quantity);
-      if (!Number.isInteger(qty) || qty < 1) {
+      if (!Number.isInteger(qty) || qty < 1 || qty > 100) {
         return json({ error: `Invalid quantity for ${pid}` }, 400);
       }
-      subtotal += price * qty;
-      orderItems.push({ product_id: pid, quantity: qty, price });
+      const pricePaise = Math.round(price * 100);
+      if (Math.abs(price * 100 - pricePaise) > 0.000001) {
+        return json({ error: `Invalid price precision for ${pid}` }, 400);
+      }
+      subtotalPaise += pricePaise * qty;
+      quantitiesByProduct.set(pid, (quantitiesByProduct.get(pid) || 0) + qty);
+      orderItems.push({
+        product_id: pid,
+        quantity: qty,
+        price,
+        variant_label: variantLabel,
+      });
+    }
+    for (const [pid, quantity] of quantitiesByProduct) {
+      const stock = Number(productMap.get(pid)?.stock);
+      if (!Number.isInteger(stock) || stock < quantity) {
+        return json({ error: `Insufficient stock for ${pid}` }, 409);
+      }
     }
     // Minimum order value, enforced server-side on the subtotal (excl. shipping)
     // so it can't be bypassed by calling this function directly.
     const MIN_ORDER_VALUE = 2000;
-    if (subtotal < MIN_ORDER_VALUE) {
+    if (subtotalPaise < MIN_ORDER_VALUE * 100) {
       return json(
         {
           error:
@@ -136,10 +168,14 @@ Deno.serve(async (req) => {
 
     // The browser chooses the surprise percentage, but the server caps it and
     // calculates the actual saving from authoritative database prices.
-    const discountAmount = Math.round(subtotal * discountPercent) / 100;
-    const shipping = 100;
-    const total = subtotal - discountAmount + shipping;
-    if (total <= 0) return json({ error: "Invalid order total" }, 400);
+    const discountPaise = Math.round(subtotalPaise * discountPercent / 100);
+    const discountAmount = discountPaise / 100;
+    const amountPaise = subtotalPaise - discountPaise + 10000;
+    const total = amountPaise / 100;
+    if (!Number.isSafeInteger(amountPaise) || amountPaise <= 0) return json({ error: "Invalid order total" }, 400);
+    if (Number(expected_total_paise) !== amountPaise) {
+      return json({ error: "Cart prices have changed. Please remove and add the products again before paying." }, 409);
+    }
 
     // Create the pending order.
     const { data: order, error: orderErr } = await admin
@@ -149,7 +185,7 @@ Deno.serve(async (req) => {
         total_amount: total,
         discount_percent: discountPercent,
         discount_amount: discountAmount,
-        address,
+        address: address.trim(),
         status: "pending",
         payment_provider: "razorpay",
         payment_status: "created",
@@ -158,40 +194,51 @@ Deno.serve(async (req) => {
       .single();
     if (orderErr) throw orderErr;
 
+    const discardDraftOrder = async () => {
+      const { error } = await admin.from("orders").delete().eq("id", order.id);
+      if (error) console.error("Could not discard incomplete checkout order", order.id, error);
+    };
+
     const { error: itemsErr } = await admin
       .from("order_items")
       .insert(orderItems.map((oi) => ({ ...oi, order_id: order.id })));
-    if (itemsErr) throw itemsErr;
+    if (itemsErr) {
+      await discardDraftOrder();
+      throw itemsErr;
+    }
 
     // Create the Razorpay order (amount in paise).
-    const amountPaise = Math.round(total * 100);
-    const resp = await razorpayFetch("/orders", {
-      method: "POST",
-      body: JSON.stringify({
-        amount: amountPaise,
-        currency: "INR",
-        receipt: order.id,
-        notes: {
-          user_id: user.id,
-          phone: String(phone || "").replace(/\D/g, "").slice(-10),
-          discount_percent: String(discountPercent),
-          discount_amount: discountAmount.toFixed(2),
-        },
-      }),
-    });
+    let resp: Response;
+    try {
+      resp = await razorpayFetch("/orders", {
+        method: "POST",
+        body: JSON.stringify({
+          amount: amountPaise,
+          currency: "INR",
+          receipt: order.id,
+          notes: {
+            user_id: user.id,
+            phone: phoneDigits,
+            discount_percent: String(discountPercent),
+            discount_amount: discountAmount.toFixed(2),
+          },
+        }),
+      });
+    } catch (error) {
+      await discardDraftOrder();
+      throw error;
+    }
     const data = await resp.json().catch(() => ({}));
 
     if (!resp.ok || !data?.id) {
       // Roll back the order so failed attempts don't leave orphans.
-      await admin.from("order_items").delete().eq("order_id", order.id);
-      await admin.from("orders").delete().eq("id", order.id);
+      await discardDraftOrder();
       console.error("Razorpay order creation failed", resp.status, JSON.stringify(data));
       return json(
         {
           error:
             data?.error?.description || data?.error?.reason ||
             "Razorpay order creation failed",
-          detail: data,
         },
         502,
       );
@@ -210,6 +257,7 @@ Deno.serve(async (req) => {
       .eq("user_id", user.id);
     if (gatewayOrderErr) {
       console.error("Could not persist Razorpay order id", gatewayOrderErr);
+      await discardDraftOrder();
       return json({ error: "Could not prepare payment. Please try again." }, 500);
     }
 
@@ -224,6 +272,6 @@ Deno.serve(async (req) => {
     });
   } catch (e) {
     console.error("razorpay-create-order error", e);
-    return json({ error: String((e as Error)?.message || e) }, 500);
+    return json({ error: "Could not prepare payment. Please try again." }, 500);
   }
 });

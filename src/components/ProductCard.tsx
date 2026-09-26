@@ -7,6 +7,7 @@ import { shareProduct } from '@/lib/share';
 import { cn } from '@/lib/utils';
 import { stripKnownBrandPrefix } from '@/lib/catalog';
 import { formatRupees } from '@/lib/money';
+import { getProductPrimaryImage } from '@/lib/productImages';
 
 interface ProductCardProps {
   product: any;
@@ -19,10 +20,7 @@ const ProductCard = ({ product, isInWishlist, onWishlistToggle }: ProductCardPro
   const navigate = useNavigate();
   const [shared, setShared] = useState(false);
 
-  // Use the first image from the array, fallback to legacy image_url, then placeholder
-  const imageUrl = (product.images && product.images.length > 0) 
-    ? product.images[0] 
-    : (product.image_url || product.image || '/placeholder.svg');
+  const imageUrl = getProductPrimaryImage(product);
     
   const categoryName = product.categories?.name || product.subcategory || 'Uncategorized';
   const brandName = product.brands?.name || product.brand?.name;

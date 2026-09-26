@@ -45,7 +45,7 @@ Deno.serve(async (req) => {
     const admin = createClient(supabaseUrl, serviceKey);
     const { data: order, error: orderError } = await admin
       .from("orders")
-      .select("id, user_id, total_amount, status, payment_provider, payment_provider_order_id, payment_id")
+      .select("id, user_id, total_amount, status, payment_provider, payment_provider_order_id, payment_id, inventory_issue")
       .eq("id", orderId)
       .single();
     if (orderError || !order || order.user_id !== user.id) {
@@ -54,11 +54,12 @@ Deno.serve(async (req) => {
 
     // A duplicate client request after a successful redirect is harmless, but
     // only when it refers to the same payment already stored on the order.
-    if (order.status === "confirmed") {
+    if (order.payment_id) {
       return json({
         verified: order.payment_id === razorpayPaymentId,
         orderId,
-        error: order.payment_id === razorpayPaymentId ? undefined : "Order is already confirmed",
+        inventoryIssue: order.inventory_issue,
+        error: order.payment_id === razorpayPaymentId ? undefined : "Order is already paid",
       }, order.payment_id === razorpayPaymentId ? 200 : 409);
     }
     if (order.status !== "pending") {
@@ -113,21 +114,19 @@ Deno.serve(async (req) => {
       return json({ verified: false, error: "Payment has not been captured" }, 409);
     }
 
-    const { error: updateError } = await admin
-      .from("orders")
-      .update({
-        status: "confirmed",
-        payment_id: razorpayPaymentId,
-        payment_status: payment.status,
-        payment_verified_at: new Date().toISOString(),
-      })
-      .eq("id", order.id)
-      .eq("user_id", user.id);
-    if (updateError) throw updateError;
+    const { data: confirmation, error: confirmError } = await admin.rpc(
+      "confirm_razorpay_payment",
+      {
+        p_order_id: order.id,
+        p_provider_order_id: razorpayOrderId,
+        p_payment_id: razorpayPaymentId,
+      },
+    );
+    if (confirmError) throw confirmError;
 
-    return json({ verified: true, orderId });
+    return json({ verified: true, orderId, inventoryIssue: confirmation?.inventory_issue === true });
   } catch (e) {
     console.error("razorpay-verify error", e);
-    return json({ verified: false, error: String((e as Error)?.message || e) }, 500);
+    return json({ verified: false, error: "Could not confirm payment. Please check your order status." }, 500);
   }
 });

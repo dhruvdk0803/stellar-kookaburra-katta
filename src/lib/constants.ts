@@ -8,4 +8,4 @@ export const MIN_CART_DISCOUNT_PERCENT = 1;
 export const MAX_CART_DISCOUNT_PERCENT = 5;
 
 export const calculateCartDiscount = (subtotal: number, discountPercent: number) =>
-  Math.round(subtotal * discountPercent) / 100;
+  Math.round(Math.round(subtotal * 100) * discountPercent / 100) / 100;

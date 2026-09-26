@@ -2,7 +2,7 @@
 # One-shot Razorpay + Supabase Edge Function setup.
 #
 # Reads credentials from ../.razorpay.env, pushes them to Supabase as function
-# secrets, applies the payment metadata migration, and deploys the Razorpay
+# secrets, applies pending database migrations, and deploys the Razorpay
 # functions. Secret values are never echoed.
 #
 # Usage:  bash scripts/setup-razorpay.sh
@@ -38,7 +38,7 @@ echo "==> 1/4 Checking Supabase access token"
 $SB projects list >/dev/null
 echo "    OK"
 
-echo "==> 2/4 Applying the Razorpay payment metadata migration"
+echo "==> 2/4 Applying pending database migrations"
 $SB db push --project-ref "$PROJECT_REF"
 echo "    Done"
 
