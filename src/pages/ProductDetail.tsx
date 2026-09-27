@@ -16,7 +16,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { stripKnownBrandPrefix } from '@/lib/catalog';
 import { formatRupees } from '@/lib/money';
-import { getProductImages } from '@/lib/productImages';
+import { getProductImages, getVariantDisplayImage } from '@/lib/productImages';
 
 type ProductVariant = {
   label: string;
@@ -310,7 +310,7 @@ const ProductDetail = () => {
                       key={idx}
                       onClick={() => {
                         setSelectedVariant(idx);
-                        setSelectedImage(v.image || allImages[0]);
+                        setSelectedImage(getVariantDisplayImage(v, variants, allImages[0]));
                       }}
                       aria-pressed={selectedVariant === idx}
                       className={cn(

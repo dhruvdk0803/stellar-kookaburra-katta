@@ -20,3 +20,17 @@ export const getProductPrimaryImage = (product: ProductMedia): string =>
 
 export const getSavedVariantImage = (image: unknown, gallery: string[]): string | undefined =>
   typeof image === 'string' && gallery.includes(image) ? image : undefined;
+
+// A photo repeated on every option does not describe a particular option.
+// Prefer the current gallery photo in that case: older imported option photos
+// can otherwise replace an updated product image as soon as a size is chosen.
+export const getVariantDisplayImage = (
+  variant: { image?: unknown },
+  variants: { image?: unknown }[],
+  primaryImage: string,
+): string => {
+  const image = typeof variant.image === 'string' && variant.image.trim() ? variant.image : undefined;
+  if (!image) return primaryImage;
+  const sharedByEveryOption = variants.length > 1 && variants.every((option) => option.image === image);
+  return sharedByEveryOption && primaryImage !== '/placeholder.svg' ? primaryImage : image;
+};
