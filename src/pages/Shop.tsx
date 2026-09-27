@@ -76,6 +76,7 @@ const Shop = () => {
   const [categories, setCategories] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [sortBy, setSortBy] = useState('newest');
+  const [visibleCount, setVisibleCount] = useState(24);
   // Price slider ceiling: the highest-priced active product, rounded up to a
   // clean step, so premium items (e.g. digital locks) are never filtered out.
   const [priceMax, setPriceMax] = useState(10000);
@@ -122,6 +123,9 @@ const Shop = () => {
 
   const categoriesById = React.useMemo(() => new Map(categories.map((category) => [category.id, category])), [categories]);
   const searchTerm = location.state?.search || searchParams.get('search') || '';
+  useEffect(() => {
+    setVisibleCount(24);
+  }, [filters, sortBy, searchTerm]);
   const searchMatchedProducts = React.useMemo(() => {
     const normalizedSearch = normalizeFilterValue(searchTerm);
     return normalizedSearch
@@ -262,7 +266,7 @@ const Shop = () => {
                 <div className="lg:hidden">
                   <Sheet>
                     <SheetTrigger asChild>
-                      <Button variant="outline" className="flex items-center gap-2">
+                      <Button variant="outline" aria-label="Open filters" className="flex items-center gap-2">
                         <Filter className="h-4 w-4" />
                         <span className="hidden sm:inline">Filters</span>
                       </Button>
@@ -287,7 +291,7 @@ const Shop = () => {
             ) : (
               <>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {filteredProducts.map((product) => (
+                  {filteredProducts.slice(0, visibleCount).map((product) => (
                     <ProductCard
                       key={product.id}
                       product={product}
@@ -296,6 +300,14 @@ const Shop = () => {
                     />
                   ))}
                 </div>
+                {filteredProducts.length > visibleCount && (
+                  <div className="mt-10 flex flex-col items-center gap-3 text-center">
+                    <p className="text-sm text-gray-600">Showing {visibleCount} of {filteredProducts.length} products</p>
+                    <Button variant="outline" className="min-h-11 rounded-full px-8" onClick={() => setVisibleCount((count) => count + 24)}>
+                      Load more products
+                    </Button>
+                  </div>
+                )}
                 {filteredProducts.length === 0 && (
                   <div className="text-center py-12">
                     <p className="text-gray-500 text-lg">No products found. Try adjusting your filters or add some from the Admin panel.</p>

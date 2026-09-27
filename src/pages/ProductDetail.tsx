@@ -239,7 +239,7 @@ const ProductDetail = () => {
           
           {/* Image Gallery */}
           <div className="space-y-4">
-            <div className="aspect-square md:aspect-auto md:h-[500px] w-full rounded-2xl overflow-hidden border border-gray-100 shadow-sm bg-gray-50">
+            <div className="aspect-[4/3] sm:aspect-square md:aspect-auto md:h-[500px] w-full rounded-2xl overflow-hidden border border-gray-100 shadow-sm bg-gray-50">
               <img src={selectedImage} alt={product.name} className="w-full h-full object-contain" />
             </div>
             {allImages.length > 1 && (
