@@ -372,7 +372,7 @@ const ProductDetail = () => {
             <div className="flex items-start gap-3 bg-green-50/50 border border-green-100 p-4 rounded-xl mt-4">
               <ShieldCheck className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
               <p className="text-sm text-gray-700">
-                <span className="font-semibold text-gray-900">Return Policy:</span> If a damaged product is received, it can be returned within 2 days of delivery.
+                <span className="font-semibold text-gray-900">Return Policy:</span> Eligible items may be returned within 2 days of delivery. Doorskins, wall panels, laminates, and digital locks are excluded. <Link to="/returns" className="font-medium underline underline-offset-2">See full policy</Link>.
               </p>
             </div>
           </div>

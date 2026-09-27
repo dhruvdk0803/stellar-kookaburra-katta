@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import Navigation from '@/components/Navigation';
 import Footer from '@/components/Footer';
 import { Button } from '@/components/ui/button';
@@ -11,8 +11,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Auth } from '@supabase/auth-ui-react';
-import { ThemeSupa } from '@supabase/auth-ui-shared';
 import { Loader2, LogOut, Package, Tags, ShoppingBag, Edit2, Trash2, X, DollarSign, Activity, LayoutDashboard, ChevronDown, ChevronUp, Upload, Image as ImageIcon, FileSpreadsheet, Wrench } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
 import { ensureBrandPrefix, stripKnownBrandPrefix } from '@/lib/catalog';
@@ -642,24 +640,6 @@ const Admin = () => {
     navigate('/');
   };
 
-  if (isLoading) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
-
-  if (!user || (profile && profile.role !== 'admin')) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex flex-col font-poppins">
-        <Navigation />
-        <div className="flex-1 flex items-center justify-center py-12 px-4">
-          <div className="max-w-md w-full bg-white p-8 rounded-2xl shadow-sm border border-gray-100 text-center">
-            <h1 className="text-3xl font-playfair font-bold text-red-600 mb-4">Access Denied</h1>
-            <p className="text-gray-600 mb-8">You do not have administrator privileges.</p>
-            <Button onClick={() => navigate('/')} className="w-full rounded-full">Return to Home</Button>
-          </div>
-        </div>
-        <Footer />
-      </div>
-    );
-  }
-
   const totalRevenue = orders.filter(countsAsRevenue).reduce((sum, o) => sum + Number(o.total_amount), 0);
   const activeProductCount = products.filter((product) => product.is_active !== false).length;
   const productCategoryOptions = prodBrand && !showAllProductCategories ? getCategoriesForBrand(categories, products, prodBrand) : categories;
@@ -694,6 +674,28 @@ const Admin = () => {
     .map((variant) => parsePrice(variant.price))
     .filter((price) => Number.isFinite(price) && price >= 0);
   const lowestVariantPrice = validVariantPrices.length > 0 ? Math.min(...validVariantPrices) : null;
+
+  if (isLoading) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
+
+  if (!user || profile?.role !== 'admin') {
+    return (
+      <div className="min-h-screen bg-gray-50 flex flex-col font-poppins">
+        <Navigation />
+        <div className="flex-1 flex items-center justify-center py-12 px-4">
+          <div className="max-w-md w-full bg-white p-8 rounded-2xl shadow-sm border border-gray-100 text-center">
+            <h1 className="text-3xl font-playfair font-bold text-gray-900 mb-4">{user ? 'Access Denied' : 'Admin Sign In'}</h1>
+            <p className="text-gray-600 mb-8">{user ? 'This account does not have administrator access.' : 'Sign in with an administrator account to open the dashboard.'}</p>
+            {user ? (
+              <Button onClick={() => navigate('/')} className="w-full rounded-full">Return to Home</Button>
+            ) : (
+              <Button asChild className="w-full rounded-full"><Link to="/login?next=/admin">Sign In</Link></Button>
+            )}
+          </div>
+        </div>
+        <Footer />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 font-poppins">

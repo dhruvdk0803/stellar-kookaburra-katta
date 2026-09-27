@@ -163,7 +163,7 @@ const Navigation = () => {
   };
 
   return (
-    <nav className="sticky top-0 z-50 w-full bg-white/95 backdrop-blur-md border-b border-gray-200/50 shadow-sm transition-all duration-300">
+    <nav className="sticky top-0 z-50 w-full bg-white border-b border-gray-200/50 shadow-sm transition-all duration-300">
       <div className="max-w-7xl mx-auto px-4">
         <div className="flex justify-between items-center py-3">
           {/* Logo */}
@@ -171,7 +171,7 @@ const Navigation = () => {
             <img
               src="/images/katta-interiors-logo.jpg"
               alt="Katta Interiors"
-              className="h-16 w-16 object-contain xl:h-[72px] xl:w-[72px]"
+              className="h-16 w-16 object-contain mix-blend-multiply xl:h-[72px] xl:w-[72px]"
               width="72"
               height="72"
             />
@@ -296,7 +296,7 @@ const Navigation = () => {
                 </Link>
               </Button>
               <Button variant="ghost" size="icon" asChild className="relative hover:bg-primary/5 rounded-full transition-all duration-200 h-10 w-10 p-0">
-                <Link to="/cart">
+                <Link to="/cart" aria-label="View cart">
                   <ShoppingCart className="h-5 w-5 text-gray-700" />
                   {cartCount > 0 && (
                     <span className="absolute -top-1 -right-1 bg-primary text-primary-foreground text-xs rounded-full h-5 w-5 flex items-center justify-center font-medium shadow-lg">
@@ -316,7 +316,7 @@ const Navigation = () => {
           {/* Mobile Menu Trigger */}
           <div className="xl:hidden flex items-center space-x-2">
             <Button variant="ghost" size="icon" asChild className="relative hover:bg-primary/5 rounded-full transition-all duration-200 h-10 w-10 p-0">
-              <Link to="/cart">
+              <Link to="/cart" aria-label="View cart">
                 <ShoppingCart className="h-5 w-5 text-gray-700" />
                 {cartCount > 0 && (
                   <span className="absolute -top-1 -right-1 bg-primary text-primary-foreground text-xs rounded-full h-5 w-5 flex items-center justify-center font-medium shadow-lg">
@@ -327,7 +327,7 @@ const Navigation = () => {
             </Button>
             <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
               <SheetTrigger asChild>
-                <Button variant="ghost" size="icon" className="hover:bg-primary/5 rounded-full transition-all duration-200 h-10 w-10 p-0">
+                <Button variant="ghost" size="icon" aria-label="Open menu" className="hover:bg-primary/5 rounded-full transition-all duration-200 h-10 w-10 p-0">
                   <Menu className="h-6 w-6" />
                 </Button>
               </SheetTrigger>

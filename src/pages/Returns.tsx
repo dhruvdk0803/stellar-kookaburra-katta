@@ -6,24 +6,24 @@ const Returns = () => {
   return (
     <div className="min-h-screen bg-white font-poppins flex flex-col">
       <Navigation />
-      <div className="flex-1 py-20 px-4">
+      <div className="flex-1 py-12 px-4 sm:py-20">
         <div className="max-w-4xl mx-auto">
-          <h1 className="text-4xl font-playfair font-bold text-gray-900 mb-8">Returns & Refunds</h1>
+          <h1 className="text-3xl sm:text-4xl font-playfair font-bold text-gray-900 mb-8">Returns & Refunds</h1>
           
           <div className="space-y-8 text-gray-700 leading-relaxed">
             <section>
               <h2 className="text-2xl font-semibold text-gray-900 mb-4">1. Return Window</h2>
-              <p>We accept returns up to 7 days after delivery, if the item is unused and in its original condition. We will refund the full order amount minus the shipping costs for the return.</p>
+              <p>Eligible items can be returned within 2 days of delivery if they are unused, in their original condition, and in their original packaging. Doorskins, wall panels, laminates, and digital locks are excluded from this return policy.</p>
             </section>
 
             <section>
               <h2 className="text-2xl font-semibold text-gray-900 mb-4">2. Condition of Returned Items</h2>
-              <p>To be eligible for a return, your item must be in the same condition that you received it. It must also be in the original packaging. Any sheets or panels that have been cut, glued, or altered in any way cannot be returned.</p>
+              <p>Returned items must be unused and unaltered, with their original packaging. Contact us within the 2-day window to request a return. Return shipping costs are deducted from an approved refund.</p>
             </section>
 
             <section>
               <h2 className="text-2xl font-semibold text-gray-900 mb-4">3. Damages and Issues</h2>
-              <p className="mb-4">Please inspect your order upon reception and contact us immediately if the item is defective, damaged, or if you receive the wrong item, so that we can evaluate the issue and make it right. In the event that your order arrives damaged in any way, please email us as soon as possible at kattainterior@gmail.com with your order number and a photo of the item's condition.</p>
+              <p className="mb-4">Please inspect your order when it arrives. If any item, including an excluded item, is damaged, defective, or incorrect, contact us immediately so we can evaluate the issue. Email kattainterior@gmail.com with your order number and a photo of the item's condition.</p>
               <p><strong>For wrong and defective products the replacement delivery timeframe will be 7-14 days.</strong></p>
             </section>
 

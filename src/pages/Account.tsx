@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import Navigation from '@/components/Navigation';
 import Footer from '@/components/Footer';
 import { Button } from '@/components/ui/button';
@@ -92,8 +92,9 @@ const Account = () => {
       <Navigation />
       <div className="py-12 px-4">
         <div className="max-w-5xl mx-auto">
-          <div className="flex justify-between items-center mb-8">
+          <div className="flex flex-wrap justify-between items-center gap-4 mb-8">
             <h1 className="text-3xl font-playfair font-bold text-gray-900">My Account</h1>
+            {profile?.role === 'admin' && <Button asChild variant="outline"><Link to="/admin">Admin Dashboard</Link></Button>}
           </div>
           
           {/* Profile Card */}

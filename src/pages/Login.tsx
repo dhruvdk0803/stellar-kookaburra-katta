@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import Navigation from '@/components/Navigation';
 import Footer from '@/components/Footer';
 import { Card, CardContent } from '@/components/ui/card';
@@ -11,14 +11,16 @@ import { useGoogleAuthEnabled } from '@/hooks/useGoogleAuthEnabled';
 
 const Login = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { session } = useAuth();
   const googleEnabled = useGoogleAuthEnabled();
+  const nextPath = searchParams.get('next') === '/admin' ? '/admin' : '/account';
 
   useEffect(() => {
     if (session) {
-      navigate('/account');
+      navigate(nextPath, { replace: true });
     }
-  }, [session, navigate]);
+  }, [session, navigate, nextPath]);
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col font-poppins">
@@ -37,7 +39,7 @@ const Login = () => {
                 appearance={{ theme: ThemeSupa }}
                 theme="light"
                 providers={googleEnabled ? ['google'] : []}
-                redirectTo={window.location.origin + '/account'}
+                redirectTo={window.location.origin + nextPath}
               />
               
             </CardContent>

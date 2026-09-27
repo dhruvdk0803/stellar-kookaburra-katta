@@ -6,24 +6,20 @@ const Shipping = () => {
   return (
     <div className="min-h-screen bg-white font-poppins flex flex-col">
       <Navigation />
-      <div className="flex-1 py-20 px-4">
+      <div className="flex-1 py-12 px-4 sm:py-20">
         <div className="max-w-4xl mx-auto">
-          <h1 className="text-4xl font-playfair font-bold text-gray-900 mb-8">Shipping Policy</h1>
+          <h1 className="text-3xl sm:text-4xl font-playfair font-bold text-gray-900 mb-8">Shipping Policy</h1>
           
           <div className="space-y-8 text-gray-700 leading-relaxed">
             <section>
-              <h2 className="text-2xl font-semibold text-gray-900 mb-4">1. Order Processing Time</h2>
-              <p>All orders are processed within 1 to 3 business days (excluding weekends and holidays) after receiving your order confirmation email. You will receive another notification when your order has shipped.</p>
+              <h2 className="text-2xl font-semibold text-gray-900 mb-4">1. Order Processing</h2>
+              <p>We begin processing orders after confirmation. We will contact you if an item is unavailable or your order needs special delivery arrangements.</p>
             </section>
 
             <section>
               <h2 className="text-2xl font-semibold text-gray-900 mb-4">2. Delivery Timeline</h2>
-              <p className="mb-4"><strong>The products will be shipped and delivered within 7-10 days.</strong></p>
-              <p className="mb-4">Shipping charges for your order will be calculated and displayed at checkout. We offer the following shipping options within India:</p>
-              <ul className="list-disc pl-6 space-y-2">
-                <li><strong>Standard Shipping:</strong> 5-7 business days. Free for orders over ₹5,000.</li>
-                <li><strong>Express Shipping:</strong> 2-3 business days. Additional charges apply.</li>
-              </ul>
+              <p className="mb-4">For available items delivered locally in Jaipur, we try to deliver in under 2 hours. This is an aim, not a guaranteed delivery time. Availability, order size, delivery location, and transport conditions may affect timing.</p>
+              <p>We will confirm delivery arrangements for orders outside the local area or for items that need special transport. Shipping charges are displayed at checkout.</p>
             </section>
 
             <section>
@@ -38,7 +34,7 @@ const Shipping = () => {
 
             <section>
               <h2 className="text-2xl font-semibold text-gray-900 mb-4">5. How do I check the status of my order?</h2>
-              <p>When your order has shipped, you will receive an email notification from us which will include a tracking number you can use to check its status. Please allow 48 hours for the tracking information to become available.</p>
+              <p>Check your order status in your account or contact our team for a delivery update. Tracking details will be shared when available.</p>
             </section>
           </div>
         </div>

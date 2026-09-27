@@ -35,6 +35,7 @@ const WhyChooseKatta = () => {
             ))}
           </div>
         </div>
+        <p className="mt-8 border-t border-white/[0.15] pt-6 text-sm leading-6 text-white/[0.68]">For available items in Jaipur, we try to deliver in under 2 hours. Delivery times are not guaranteed.</p>
       </div>
     </section>
   );
