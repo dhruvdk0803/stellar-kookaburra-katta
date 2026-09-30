@@ -39,6 +39,56 @@ const getErrorMessage = (error: unknown) => {
   return String(error);
 };
 
+// Slugs end up in /shop?category=... links: trim, lowercase and never contain spaces.
+const normalizeSlug = (value: string) => value.trim().toLowerCase().replace(/\s+/g, '-');
+
+// RFC 4180-style parser: quoted fields may contain commas, doubled quotes and line breaks.
+const parseCsv = (text: string): string[][] => {
+  const source = text.replace(/^﻿/, '');
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let field = '';
+  let inQuotes = false;
+  for (let i = 0; i < source.length; i++) {
+    const char = source[i];
+    if (inQuotes) {
+      if (char === '"') {
+        if (source[i + 1] === '"') { field += '"'; i++; } else inQuotes = false;
+      } else field += char;
+    } else if (char === '"' && field === '') {
+      inQuotes = true;
+    } else if (char === ',') {
+      row.push(field); field = '';
+    } else if (char === '\n' || char === '\r') {
+      if (char === '\r' && source[i + 1] === '\n') i++;
+      row.push(field); rows.push(row); row = []; field = '';
+    } else field += char;
+  }
+  if (inQuotes) throw new Error('CSV has a quoted field that is never closed.');
+  row.push(field);
+  if (row.some((value) => value.trim() !== '')) rows.push(row);
+  return rows;
+};
+
+const parseCsvNumber = (value: string) => {
+  const cleaned = value.replace(/[₹,\s]/g, '');
+  return cleaned === '' ? Number.NaN : Number(cleaned);
+};
+
+// Mirrors the DB trigger on orders: paid -> pending, reopening cancelled, cancelling
+// razorpay orders and fulfilling uncaptured razorpay orders are all rejected, so
+// they are not offered. The current status is always listed so the select never renders blank.
+const getOrderStatusOptions = (order: { status: string; payment_id?: string | null; payment_provider?: string | null; payment_status?: string | null }) => {
+  if (order.status === 'cancelled') return ['cancelled'];
+  const isRazorpay = order.payment_provider === 'razorpay';
+  const options: string[] = [];
+  if (!order.payment_id && order.payment_status !== 'captured') options.push('pending');
+  if (!isRazorpay || order.payment_status === 'captured') options.push('confirmed', 'processing', 'shipped', 'delivered');
+  if (!isRazorpay) options.push('cancelled');
+  if (!options.includes(order.status)) options.unshift(order.status);
+  return options;
+};
+
 interface ProductCategoryOption {
   id: string;
   name: string;
@@ -110,10 +160,12 @@ async function fetchAllAdminProducts(): Promise<any[]> {
 
 async function fetchAllAdminOrders() {
   const PAGE_SIZE = 250;
-  const allOrders = [];
+  const allOrders: any[] = [];
   for (let from = 0; ; from += PAGE_SIZE) {
+    // orders.user_id references auth.users, not profiles, so PostgREST cannot
+    // embed profiles here (PGRST200). Customer names are joined below instead.
     const { data, error } = await supabase.from('orders')
-      .select('*, profiles(name), order_items(*, products(name, image_url, images))')
+      .select('*, order_items(*, products(name, image_url, images))')
       .order('created_at', { ascending: false })
       .order('id', { ascending: false })
       .range(from, from + PAGE_SIZE - 1);
@@ -122,7 +174,15 @@ async function fetchAllAdminOrders() {
     allOrders.push(...data);
     if (data.length < PAGE_SIZE) break;
   }
-  return allOrders;
+
+  const userIds = [...new Set(allOrders.map((order) => order.user_id).filter(Boolean))];
+  const names = new Map<string, string | null>();
+  for (let i = 0; i < userIds.length; i += 100) {
+    const { data, error } = await supabase.from('profiles').select('id, name').in('id', userIds.slice(i, i + 100));
+    if (error) break; // names are cosmetic; never hide orders because of them
+    data?.forEach((p) => names.set(p.id, p.name));
+  }
+  return allOrders.map((order) => ({ ...order, profiles: { name: names.get(order.user_id) ?? null } }));
 }
 
 const countsAsRevenue = (order: { status: string; payment_provider?: string | null; payment_status?: string | null }) =>
@@ -185,41 +245,42 @@ const Admin = () => {
     }
   }, [profile]);
 
+  // Each dataset loads independently: one failing query (e.g. orders) must not
+  // blank the product, category, and brand tabs.
   const fetchData = async () => {
-    try {
-      const [catRes, brandRes, prodRes, ordRes] = await Promise.all([
-      supabase.from('categories').select('*, parent:parent_id(name)').order('created_at', { ascending: false }),
-      supabase.from('brands').select('*').order('display_order').order('name'),
+    const unwrap = async <T,>(query: PromiseLike<{ data: T | null; error: unknown }>) => {
+      const { data, error } = await query;
+      if (error) throw error;
+      return data;
+    };
+    const [catRes, brandRes, prodRes, ordRes] = await Promise.allSettled([
+      unwrap(supabase.from('categories').select('*, parent:parent_id(name)').order('created_at', { ascending: false })),
+      unwrap(supabase.from('brands').select('*').order('display_order').order('name')),
       fetchAllAdminProducts(),
       fetchAllAdminOrders()
     ]);
-      if (catRes.error) throw catRes.error;
-      if (brandRes.error) throw brandRes.error;
-      setCategories(catRes.data || []);
-      setBrands(brandRes.data || []);
-      setProducts(prodRes);
-      setOrders(ordRes);
-    } catch (error) {
-      toast.error(`Could not load admin data: ${getErrorMessage(error)}`);
-    }
+    const failed: string[] = [];
+    if (catRes.status === 'fulfilled') setCategories(catRes.value || []); else failed.push(`categories (${getErrorMessage(catRes.reason)})`);
+    if (brandRes.status === 'fulfilled') setBrands(brandRes.value || []); else failed.push(`brands (${getErrorMessage(brandRes.reason)})`);
+    if (prodRes.status === 'fulfilled') setProducts(prodRes.value); else failed.push(`products (${getErrorMessage(prodRes.reason)})`);
+    if (ordRes.status === 'fulfilled') setOrders(ordRes.value); else failed.push(`orders (${getErrorMessage(ordRes.reason)})`);
+    if (failed.length) toast.error(`Could not load admin data: ${failed.join('; ')}`);
   };
 
   // --- Chart Data Processing ---
   const chartData = useMemo(() => {
     if (!orders.length) return [];
     
-    // Get last 7 days
-    const days = [...Array(7)].map((_, i) => {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
-      return d.toISOString().split('T')[0];
-    }).reverse();
+    // Bucket by India calendar day (IST, UTC+5:30). toISOString() is UTC and would
+    // push orders placed between midnight and 05:30 IST into the previous day.
+    const istDay = (date: Date) => date.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+    const days = [...Array(7)].map((_, i) => istDay(new Date(Date.now() - i * 86400000))).reverse();
 
     return days.map(date => {
-      const dayOrders = orders.filter(o => o.created_at.startsWith(date) && countsAsRevenue(o));
+      const dayOrders = orders.filter(o => o.created_at && istDay(new Date(o.created_at)) === date && countsAsRevenue(o));
       return {
-        date: new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-        revenue: dayOrders.reduce((sum, o) => sum + Number(o.total_amount), 0),
+        date: new Date(`${date}T12:00:00+05:30`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'Asia/Kolkata' }),
+        revenue: dayOrders.reduce((sum, o) => sum + (Number(o.total_amount) || 0), 0),
         orders: dayOrders.length
       };
     });
@@ -228,7 +289,20 @@ const Admin = () => {
   // --- Category Actions ---
   const handleAddCategory = async (e: React.FormEvent) => {
     e.preventDefault();
-    const newCat: any = { name: catName, slug: catSlug, image_url: catImage || null, display_order: parseInt(catOrder) || 0 };
+    const name = catName.trim();
+    const slug = normalizeSlug(catSlug);
+    if (!name || !slug) { toast.error('Category name and slug are required.'); return; }
+    // Walk up from the chosen parent: reaching the category being edited means a cycle
+    // (this also rejects a category being its own parent).
+    if (editingCategoryId && catParentId) {
+      let ancestorId: string | null = catParentId;
+      for (let guard = 0; ancestorId && guard < 20; guard++) {
+        if (ancestorId === editingCategoryId) { toast.error('A category cannot be its own parent or sit under one of its own subcategories.'); return; }
+        const currentId: string = ancestorId;
+        ancestorId = categories.find((category) => category.id === currentId)?.parent_id ?? null;
+      }
+    }
+    const newCat: any = { name, slug, image_url: catImage.trim() || null, display_order: parseInt(catOrder) || 0 };
     newCat.parent_id = catParentId || null;
 
     const query = editingCategoryId
@@ -260,9 +334,14 @@ const Admin = () => {
 
   const handleDeleteCategory = async (id: string) => {
     if (!confirm('Delete this category? Products linked to it might be affected.')) return;
-    const { error } = await supabase.from('categories').delete().eq('id', id);
-    if (error) toast.error(error.message);
-    else { toast.success('Category deleted'); fetchData(); }
+    const { data, error } = await supabase.from('categories').delete().eq('id', id).select('id');
+    if (error) toast.error(`Could not delete category: ${error.message}`);
+    else if (!data?.length) { toast.error('Category was not deleted (it may already be gone, or you lack permission).'); fetchData(); }
+    else {
+      toast.success('Category deleted');
+      if (editingCategoryId === id) { setEditingCategoryId(null); setCatName(''); setCatSlug(''); setCatParentId(''); setCatImage(''); setCatOrder('0'); }
+      fetchData();
+    }
   };
 
   const resetBrandForm = () => {
@@ -271,10 +350,12 @@ const Admin = () => {
 
   const handleSaveBrand = async (e: React.FormEvent) => {
     e.preventDefault();
-    const values = { name: brandName.trim(), slug: brandSlug.trim().toLowerCase(), logo_url: brandLogo.trim() || null, display_order: parseInt(brandOrder) || 0, is_active: true };
+    const values = { name: brandName.trim(), slug: normalizeSlug(brandSlug), logo_url: brandLogo.trim() || null, display_order: parseInt(brandOrder) || 0 };
+    if (!values.name || !values.slug) { toast.error('Brand name and slug are required.'); return; }
+    // is_active is only set on create; sending it on edit would silently re-activate hidden brands.
     const query = editingBrandId
       ? supabase.from('brands').update(values).eq('id', editingBrandId)
-      : supabase.from('brands').insert([values]);
+      : supabase.from('brands').insert([{ ...values, is_active: true }]);
     const { error } = await query;
     if (error) toast.error(error.message);
     else { toast.success(editingBrandId ? 'Brand updated!' : 'Brand added!'); resetBrandForm(); fetchData(); }
@@ -315,6 +396,9 @@ const Admin = () => {
       const result = data as { deleted_products?: number; deleted_categories?: number } | null;
       toast.success(`Brand deleted: ${result?.deleted_products ?? productCount} product(s) and ${result?.deleted_categories ?? 0} exclusive category(ies) removed.`);
       if (editingBrandId === brand.id) resetBrandForm();
+      // The brand's products are gone: drop any edit form / filter still pointing at them.
+      if (editingProductId && products.some((product) => product.id === editingProductId && product.brand_id === brand.id)) resetProductForm();
+      if (listBrand === brand.id) { setListBrand(''); setListCategory(''); }
       await fetchData();
     } catch (error: unknown) {
       toast.error(`Brand could not be deleted: ${getErrorMessage(error)}`);
@@ -371,6 +455,7 @@ const Admin = () => {
     if (isSavingProduct || isUploadingImages) return;
     const selectedBrand = brands.find((brand) => brand.id === prodBrand);
     if (!selectedBrand) { toast.error('Select a valid brand.'); return; }
+    if (!prodName.trim()) { toast.error('Enter a product name.'); return; }
     if (!(showAllProductCategories ? categories : getCategoriesForBrand(categories, products, selectedBrand.id)).some((category) => category.id === prodCat)) {
       toast.error('Choose a category currently associated with this brand.');
       return;
@@ -455,7 +540,7 @@ const Admin = () => {
   const handleEditClick = (product: any) => {
     setEditingProductId(product.id);
     setProdName(stripKnownBrandPrefix(product.name, brands));
-    setProdPrice(product.price.toString());
+    setProdPrice(product.price == null ? '' : String(product.price));
     setProdDesc(product.description || '');
     setProdCat(product.category_id || '');
     setProdBrand(product.brand_id || '');
@@ -524,9 +609,14 @@ const Admin = () => {
 
   const handleDeleteProduct = async (id: string) => {
     if (!confirm('Are you sure you want to delete this product?')) return;
-    const { error } = await supabase.from('products').delete().eq('id', id);
-    if (error) toast.error(error.message);
-    else { toast.success('Product deleted'); fetchData(); }
+    const { data, error } = await supabase.from('products').delete().eq('id', id).select('id');
+    if (error) toast.error(`Could not delete product: ${error.message}`);
+    else if (!data?.length) { toast.error('Product was not deleted (it may already be gone, or you lack permission).'); fetchData(); }
+    else {
+      toast.success('Product deleted');
+      if (editingProductId === id) resetProductForm();
+      fetchData();
+    }
   };
 
   // --- Bulk Upload ---
@@ -536,35 +626,46 @@ const Admin = () => {
 
     setIsUploadingBulk(true);
     try {
-      const text = await file.text();
-      const lines = text.split('\n');
-      const headers = lines[0].toLowerCase().split(',').map(h => h.trim());
+      const rows = parseCsv(await file.text());
+      if (rows.length === 0) throw new Error('The CSV file is empty.');
+      const headers = rows[0].map((h) => h.trim().toLowerCase().replace(/[\s-]+/g, '_'));
       if (!headers.includes('brand') && !headers.includes('brand_slug')) throw new Error('CSV must include a brand or brand_slug column.');
-      
-      const productsToInsert = [];
-      
-      for (let i = 1; i < lines.length; i++) {
-        if (!lines[i].trim()) continue;
-        const values = lines[i].split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(v => v.replace(/^"|"$/g, '').trim());
-        
+      const allowedHeaders = ['name', 'brand', 'brand_slug', 'price', 'description', 'category_id', 'stock', 'images'];
+      const unknownHeader = headers.find((header) => header && !allowedHeaders.includes(header));
+      if (unknownHeader) throw new Error(`Unknown CSV column "${unknownHeader}". Allowed columns: ${allowedHeaders.join(', ')}.`);
+      const missingHeader = ['name', 'price', 'category_id'].find((header) => !headers.includes(header));
+      if (missingHeader) throw new Error(`CSV must include a ${missingHeader} column.`);
+
+      const productsToInsert: any[] = [];
+
+      for (let i = 1; i < rows.length; i++) {
+        const values = rows[i].map((v) => v.trim());
+        if (values.every((v) => !v)) continue;
+
         const product: any = {};
         headers.forEach((header, index) => {
-          if (header === 'price' || header === 'stock') {
-            product[header] = parseFloat(values[index]) || 0;
+          if (!header) return;
+          const value = values[index] ?? '';
+          if (header === 'price') {
+            product.price = parseCsvNumber(value);
+          } else if (header === 'stock') {
+            product.stock = value === '' ? 0 : parseCsvNumber(value);
           } else if (header === 'images') {
-            const urls = values[index] ? values[index].split(';').map(url => url.trim()) : [];
+            const urls = value.split(';').map(url => url.trim()).filter(Boolean);
             product['images'] = urls;
             if (urls.length > 0) product['image_url'] = urls[0];
           } else {
-            product[header] = values[index];
+            product[header] = value;
           }
         });
-        
-        const requestedBrand = (product.brand_slug || product.brand || '').toLowerCase();
-        const matchedBrand = brands.find((brand) => brand.slug.toLowerCase() === requestedBrand || brand.name.toLowerCase() === requestedBrand);
+
+        const requestedBrand = String(product.brand_slug || product.brand || '').toLowerCase();
+        const matchedBrand = brands.find((brand) => String(brand.slug ?? '').toLowerCase() === requestedBrand || String(brand.name ?? '').toLowerCase() === requestedBrand);
         if (!matchedBrand) throw new Error(`Row ${i + 1}: unknown brand "${product.brand_slug || product.brand || ''}".`);
         if (!product.name || !product.category_id) throw new Error(`Row ${i + 1}: name and category_id are required.`);
         if (!categories.some((category) => category.id === product.category_id)) throw new Error(`Row ${i + 1}: category_id "${product.category_id}" does not exist in Admin.`);
+        if (!Number.isFinite(product.price) || product.price <= 0) throw new Error(`Row ${i + 1}: price must be a number greater than zero.`);
+        if (product.stock !== undefined && (!Number.isInteger(product.stock) || product.stock < 0)) throw new Error(`Row ${i + 1}: stock must be a whole number of zero or more.`);
         product.brand_id = matchedBrand.id;
         product.name = ensureBrandPrefix(stripKnownBrandPrefix(product.name, brands), matchedBrand.name);
         delete product.brand;
@@ -573,14 +674,13 @@ const Admin = () => {
         productsToInsert.push(product);
       }
 
-      if (productsToInsert.length > 0) {
-        const { error } = await supabase.from('products').insert(productsToInsert);
-        if (error) throw error;
-        toast.success(`Successfully uploaded ${productsToInsert.length} products!`);
-        fetchData();
-      }
-    } catch (error: any) {
-      toast.error(`Bulk upload failed: ${error.message}`);
+      if (productsToInsert.length === 0) throw new Error('No product rows found in the CSV.');
+      const { error } = await supabase.from('products').insert(productsToInsert);
+      if (error) throw error;
+      toast.success(`Successfully uploaded ${productsToInsert.length} products!`);
+      fetchData();
+    } catch (error: unknown) {
+      toast.error(`Bulk upload failed: ${getErrorMessage(error)}`);
     } finally {
       setIsUploadingBulk(false);
       e.target.value = '';
@@ -607,8 +707,10 @@ const Admin = () => {
               .replace('👉 Acrylic sheets are positioned as more premium than Sunmica — highlight this clearly.', '')
               .replace('👉 Acrylic sheets are positioned as more premium than Sunmica - highlight this clearly.', '')
               .trim();
-              
-            await supabase.from('products').update({ description: newDesc }).eq('id', product.id);
+
+            if (newDesc === product.description.trim()) continue;
+            const { error: updateError } = await supabase.from('products').update({ description: newDesc }).eq('id', product.id);
+            if (updateError) throw new Error(`${updateError.message} (fixed ${count} before this failed)`);
             count++;
           }
         }
@@ -617,8 +719,8 @@ const Admin = () => {
       } else {
         toast.info('No products found with that description line.');
       }
-    } catch (error: any) {
-      toast.error(`Failed to fix descriptions: ${error.message}`);
+    } catch (error: unknown) {
+      toast.error(`Failed to fix descriptions: ${getErrorMessage(error)}`);
     } finally {
       setIsFixingDescriptions(false);
     }
@@ -626,9 +728,15 @@ const Admin = () => {
 
   // --- Order Actions ---
   const handleUpdateOrderStatus = async (id: string, status: string) => {
-    const { error } = await supabase.from('orders').update({ status }).eq('id', id);
-    if (error) toast.error(error.message);
-    else { toast.success('Order status updated'); fetchData(); }
+    // The status <select> is controlled, so it snaps back to the stored status when this fails.
+    const { data, error } = await supabase.from('orders').update({ status }).eq('id', id).select('id');
+    if (error) toast.error(`Order status was not changed: ${error.message}`);
+    else if (!data?.length) toast.error('Order status was not changed (order not found or not permitted).');
+    else {
+      toast.success('Order status updated');
+      setOrders((previous) => previous.map((order) => (order.id === id ? { ...order, status } : order)));
+      fetchData();
+    }
   };
 
   const toggleOrderDetails = (id: string) => {
@@ -652,7 +760,8 @@ const Admin = () => {
     const search = listSearch.trim().toLocaleLowerCase();
     const selectedCategory = categories.find((category) => category.id === listCategory);
     const categoryMatches = (categoryId: string | null) => {
-      if (!selectedCategory) return !listCategory;
+      // A filter pointing at a since-deleted category is ignored (the select already shows "All").
+      if (!selectedCategory) return true;
       let current = categories.find((category) => category.id === categoryId);
       let guard = 0;
       while (current && guard++ < 20) {
@@ -672,7 +781,7 @@ const Admin = () => {
   const hasProductVariants = prodVariants.length > 0;
   const validVariantPrices = prodVariants
     .map((variant) => parsePrice(variant.price))
-    .filter((price) => Number.isFinite(price) && price >= 0);
+    .filter((price) => Number.isFinite(price) && price > 0);
   const lowestVariantPrice = validVariantPrices.length > 0 ? Math.min(...validVariantPrices) : null;
 
   if (isLoading) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
@@ -815,14 +924,9 @@ const Admin = () => {
                                 value={order.status}
                                 onChange={(e) => handleUpdateOrderStatus(order.id, e.target.value)}
                               >
-                                {!order.payment_id && <option value="pending">Pending</option>}
-                                {(order.payment_provider !== 'razorpay' || order.payment_status === 'captured') && <>
-                                  <option value="confirmed">Confirmed</option>
-                                  <option value="processing">Processing</option>
-                                  <option value="shipped">Shipped</option>
-                                  <option value="delivered">Delivered</option>
-                                </>}
-                                {(order.payment_provider !== 'razorpay' || order.status === 'cancelled') && <option value="cancelled">Cancelled</option>}
+                                {getOrderStatusOptions(order).map((status) => (
+                                  <option key={status} value={status}>{status.charAt(0).toUpperCase() + status.slice(1)}</option>
+                                ))}
                               </select>
                               {order.inventory_issue && <div className="mt-1 text-xs font-semibold text-red-700">Check stock before fulfilment</div>}
                             </td>
@@ -852,7 +956,7 @@ const Admin = () => {
                                           </p>
                                           <div className="flex justify-between mt-1 text-sm text-gray-500">
                                             <span>Qty: {item.quantity}</span>
-                                            <span className="font-medium text-gray-900">₹{item.price * item.quantity}</span>
+                                            <span className="font-medium text-gray-900">₹{((Number(item.price) || 0) * (Number(item.quantity) || 0)).toFixed(2)}</span>
                                           </div>
                                         </div>
                                       </div>
@@ -1238,7 +1342,7 @@ const Admin = () => {
                       value={catParentId} onChange={(e) => setCatParentId(e.target.value)}
                     >
                       <option value="">No Parent (Top Level)</option>
-                      {categories.filter(c => !c.parent_id).map(c => (
+                      {categories.filter(c => !c.parent_id && c.id !== editingCategoryId).map(c => (
                         <option key={c.id} value={c.id}>{c.name}</option>
                       ))}
                     </select>

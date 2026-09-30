@@ -59,10 +59,21 @@ const projectData: { [key: string]: {
 
 const ProjectDetail = () => {
   const { id } = useParams<{ id: string }>();
-  const project = id ? projectData[id] : undefined;
+  const project = id && Object.prototype.hasOwnProperty.call(projectData, id) ? projectData[id] : undefined;
 
   if (!project) {
-    return <div>Project not found</div>;
+    return (
+      <div className="min-h-screen bg-white font-poppins flex flex-col">
+        <Navigation />
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center">
+            <h2 className="text-2xl font-playfair font-bold mb-4">Project not found</h2>
+            <Link to="/projects" className="text-teal-600 hover:underline">Return to Projects</Link>
+          </div>
+        </div>
+        <Footer />
+      </div>
+    );
   }
 
   return (
@@ -105,7 +116,7 @@ const ProjectDetail = () => {
                 ))}
               </div>
               
-              <Link to={`/shop?category=${project.category}`}>
+              <Link to={`/shop?category=${project.category === 'Panels' ? 'louvers-panels' : project.category}`}>
                 <Button className="w-full py-6 text-lg bg-teal-600 hover:bg-teal-700 rounded-xl shadow-md">
                   Shop {project.category}
                 </Button>

@@ -9,6 +9,7 @@ import { User, Package, LogOut, Clock, CheckCircle, Truck, Settings, Save, X } f
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { formatRupees } from '@/lib/money';
 
 const Account = () => {
   const { user, profile, signOut, isLoading } = useAuth();
@@ -206,7 +207,7 @@ const Account = () => {
                                 <p className="text-sm text-gray-500">Qty: {item.quantity}</p>
                               </div>
                             </div>
-                            <p className="font-medium text-gray-900">₹{item.price * item.quantity}</p>
+                            <p className="font-medium text-gray-900">₹{formatRupees(item.price * item.quantity)}</p>
                           </div>
                         ))}
                       </div>

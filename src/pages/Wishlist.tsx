@@ -13,6 +13,9 @@ const Wishlist = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Ignore responses from a superseded fetch (e.g. after removing an item
+    // quickly) so a stale list can never overwrite the current one.
+    let current = true;
     const fetchWishlist = async () => {
       setLoading(true);
       if (wishlist.length === 0) {
@@ -20,14 +23,18 @@ const Wishlist = () => {
         setLoading(false);
         return;
       }
+      // Draft/hidden products (is_active = false) must not appear here.
       const { data } = await supabase
         .from('products')
         .select('*, categories(name, slug), brands(name, slug)')
-        .in('id', wishlist);
+        .in('id', wishlist)
+        .eq('is_active', true);
+      if (!current) return;
       setProducts(data || []);
       setLoading(false);
     };
     fetchWishlist();
+    return () => { current = false; };
   }, [wishlist]);
 
   if (loading) {

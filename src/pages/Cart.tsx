@@ -11,7 +11,9 @@ import { formatRupees } from '@/lib/money';
 const Cart = () => {
   const { cart, updateQuantity, removeFromCart, clearCart, discountPercent } = useCart();
 
-  const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  // Sum in whole paise (as the server does) so float drift such as 1999.9999999999998
+  // cannot fail the minimum-order check for a cart the server would accept.
+  const subtotal = cart.reduce((sum, item) => sum + Math.round(item.price * 100) * item.quantity, 0) / 100;
   const discountAmount = calculateCartDiscount(subtotal, discountPercent);
   const total = subtotal - discountAmount; // GST is included in product prices
   const meetsMinimum = subtotal >= MIN_ORDER_VALUE;

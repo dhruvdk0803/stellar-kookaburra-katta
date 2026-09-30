@@ -43,12 +43,22 @@ export const useWishlist = () => {
 
 export const WishlistProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [wishlist, dispatch] = useReducer(wishlistReducer, [], () => {
-    const saved = localStorage.getItem('katta-wishlist');
-    return saved ? JSON.parse(saved) : [];
+    // Corrupt or blocked storage must never crash the whole app on load.
+    try {
+      const saved = localStorage.getItem('katta-wishlist');
+      const parsed = saved ? JSON.parse(saved) : [];
+      return Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === 'string') : [];
+    } catch {
+      return [];
+    }
   });
 
   useEffect(() => {
-    localStorage.setItem('katta-wishlist', JSON.stringify(wishlist));
+    try {
+      localStorage.setItem('katta-wishlist', JSON.stringify(wishlist));
+    } catch {
+      // Storage may be full or blocked (private mode); the in-memory list still works.
+    }
   }, [wishlist]);
 
   const addToWishlist = (id: string) => {

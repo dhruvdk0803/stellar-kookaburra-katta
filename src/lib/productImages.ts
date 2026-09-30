@@ -34,3 +34,10 @@ export const getVariantDisplayImage = (
   const sharedByEveryOption = variants.length > 1 && variants.every((option) => option.image === image);
   return sharedByEveryOption && primaryImage !== '/placeholder.svg' ? primaryImage : image;
 };
+
+// DB-sourced image URLs can be stale or broken; swap in the placeholder once
+// (skipped when already showing it, so a missing placeholder cannot loop).
+export const handleImageError = (event: { currentTarget: HTMLImageElement }) => {
+  const img = event.currentTarget;
+  if (!img.src.endsWith('/placeholder.svg')) img.src = '/placeholder.svg';
+};

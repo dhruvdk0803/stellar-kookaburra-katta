@@ -122,7 +122,11 @@ const Plumbing = () => {
             {availableBrands.map((brand) => (
               <button
                 key={brand.slug}
-                onClick={() => setActiveBrand(brand)}
+                onClick={() => {
+                  setActiveBrand(brand);
+                  // A subcategory id from the previous brand would match nothing here.
+                  setActiveSub('all');
+                }}
                 className={cn(
                   'px-5 py-2.5 rounded-lg text-sm font-semibold border transition-colors',
                   activeBrand.slug === brand.slug
@@ -177,7 +181,7 @@ const Plumbing = () => {
           ) : visibleProducts.length === 0 ? (
             <div className="text-center py-20">
               <p className="text-gray-500 text-lg">
-                No {activeBrand.label} products available yet. Add them from the Admin panel.
+                No {activeBrand.label} products available yet.
               </p>
             </div>
           ) : (

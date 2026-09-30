@@ -76,7 +76,7 @@ const blogPostData: { [key: string]: {
 
 const BlogPost = () => {
   const { id } = useParams<{ id: string }>();
-  const post = id ? blogPostData[id] : undefined;
+  const post = id && Object.prototype.hasOwnProperty.call(blogPostData, id) ? blogPostData[id] : undefined;
 
   // Scroll to top when post changes
   useEffect(() => {

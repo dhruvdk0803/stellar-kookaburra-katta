@@ -21,7 +21,7 @@ const directCategoryConfig = [
   { slug: 'sunmica', label: 'Laminates & Sunmica' },
   { slug: 'louvers-panels', label: 'Louvers & Wall Panels' },
   { slug: 'apollo-cpvc-fittings-pipes', label: 'CPVC Pipes & Fittings' },
-  { slug: 'apollo-swr-upvc-pipes-fittings', label: 'uPVC & SWR Pipes' },
+  { slug: 'apollo-upvc-pipes-fittings', label: 'uPVC & SWR Pipes' },
   { slug: 'ebco-hinges', label: 'Hinges' },
   { slug: 'ebco-drawer-slides', label: 'Drawer Slides' },
   { slug: 'ebco-digital-locks', label: 'Digital Locks' },

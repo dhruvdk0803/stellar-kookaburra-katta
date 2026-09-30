@@ -11,6 +11,11 @@ interface CartItem {
 
 type CartState = CartItem[];
 
+// Matches the per-line limit enforced by the razorpay-create-order function.
+const MAX_ITEM_QUANTITY = 100;
+const normalizeQuantity = (quantity: number) =>
+  Number.isFinite(quantity) ? Math.min(MAX_ITEM_QUANTITY, Math.max(0, Math.floor(quantity))) : 0;
+
 const loadSavedCart = (): CartState => {
   try {
     const saved = localStorage.getItem('katta-cart');
@@ -34,7 +39,7 @@ const loadSavedCart = (): CartState => {
         id: item.id,
         name: item.name,
         price,
-        quantity,
+        quantity: normalizeQuantity(quantity),
         image: typeof item.image === 'string' && item.image ? item.image : '/placeholder.svg',
       }];
     });
@@ -63,22 +68,27 @@ type CartAction =
 const cartReducer = (state: CartState, action: CartAction): CartState => {
   switch (action.type) {
     case 'ADD_TO_CART': {
+      // Invalid amounts (0, NaN, negative, fractional from a free-typed input) never
+      // reach the cart as-is: they fall back to 1 and are capped at the server limit.
+      const addQuantity = normalizeQuantity(action.quantity ?? 1) || 1;
       const existingItem = state.find(item => item.id === action.item.id);
       if (existingItem) {
         return state.map(item =>
           item.id === action.item.id
-            ? { ...item, quantity: item.quantity + (action.quantity || 1) }
+            ? { ...item, quantity: Math.min(MAX_ITEM_QUANTITY, item.quantity + addQuantity) }
             : item
         );
       }
-      return [...state, { ...action.item, quantity: action.quantity || 1 }];
+      return [...state, { ...action.item, quantity: addQuantity }];
     }
     case 'REMOVE_FROM_CART':
       return state.filter(item => item.id !== action.id);
-    case 'UPDATE_QUANTITY':
+    case 'UPDATE_QUANTITY': {
+      const quantity = normalizeQuantity(action.quantity);
       return state.map(item =>
-        item.id === action.id ? { ...item, quantity: action.quantity } : item
+        item.id === action.id ? { ...item, quantity } : item
       ).filter(item => item.quantity > 0);
+    }
     case 'CLEAR_CART':
       return [];
     default:

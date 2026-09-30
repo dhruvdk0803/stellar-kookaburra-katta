@@ -16,7 +16,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { stripKnownBrandPrefix } from '@/lib/catalog';
 import { formatRupees } from '@/lib/money';
-import { getProductImages, getVariantDisplayImage } from '@/lib/productImages';
+import { getProductImages, getVariantDisplayImage, handleImageError } from '@/lib/productImages';
 
 type ProductVariant = {
   label: string;
@@ -215,6 +215,9 @@ const ProductDetail = () => {
     : product.name;
 
   const handleAddToCart = () => {
+    // The number input can hold 0, negative, fractional or empty values; the
+    // cart would otherwise accept them as-is.
+    const safeQuantity = Math.min(Math.max(1, Math.floor(quantity) || 1), product.stock > 0 ? product.stock : 100);
     const variantSuffix = activeVariant && variants.length > 1 ? ` (${activeVariant.label})` : '';
     addToCart(
       {
@@ -223,12 +226,18 @@ const ProductDetail = () => {
         price: displayPrice,
         image: selectedImage || allImages[0],
       },
-      quantity
+      safeQuantity
     );
+    setQuantity(safeQuantity);
   };
 
   const handleBulkOrder = () => {
-    window.open('mailto:kattainterior@gmail.com?subject=Bulk Order Inquiry: ' + product.name, '_blank');
+    window.open('mailto:kattainterior@gmail.com?subject=' + encodeURIComponent('Bulk Order Inquiry: ' + product.name), '_blank');
+  };
+
+  const handleShare = async () => {
+    const result = await shareProduct(product.name, `${window.location.origin}/product/${product.id}`);
+    if (result === 'copied') toast.success('Product link copied to clipboard');
   };
 
   return (
@@ -240,7 +249,7 @@ const ProductDetail = () => {
           {/* Image Gallery */}
           <div className="space-y-4">
             <div className="aspect-[4/3] sm:aspect-square md:aspect-auto md:h-[500px] w-full rounded-2xl overflow-hidden border border-gray-100 shadow-sm bg-gray-50">
-              <img src={selectedImage} alt={product.name} className="w-full h-full object-contain" />
+              <img src={selectedImage} alt={product.name} onError={handleImageError} className="w-full h-full object-contain" />
             </div>
             {allImages.length > 1 && (
               <div className="flex gap-3 overflow-x-auto pb-2 snap-x [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
@@ -253,7 +262,7 @@ const ProductDetail = () => {
                       selectedImage === img ? "border-primary shadow-md" : "border-transparent hover:border-gray-300"
                     )}
                   >
-                    <img src={img} alt={`Thumbnail ${idx}`} className="w-full h-full object-cover" />
+                    <img src={img} alt={`Thumbnail ${idx}`} onError={handleImageError} className="w-full h-full object-cover" />
                   </button>
                 ))}
               </div>
@@ -267,7 +276,7 @@ const ProductDetail = () => {
               <div className="flex shrink-0 items-center gap-2">
                 <Button
                   variant="outline"
-                  onClick={() => shareProduct(product.name, `${window.location.origin}/product/${product.id}`)}
+                  onClick={handleShare}
                   className="rounded-full"
                 >
                   <Share2 className="h-4 w-4 mr-2" />

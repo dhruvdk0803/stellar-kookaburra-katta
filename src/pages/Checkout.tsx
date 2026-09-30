@@ -94,7 +94,9 @@ const Checkout = () => {
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  // Sum in whole paise (as the server does) so float drift such as 1999.9999999999998
+  // cannot fail the minimum-order check for a cart the server would accept.
+  const subtotal = cart.reduce((sum, item) => sum + Math.round(item.price * 100) * item.quantity, 0) / 100;
   const discountAmount = calculateCartDiscount(subtotal, discountPercent);
   const shipping = 100;
   const total = subtotal - discountAmount + shipping; // GST is included in product prices
@@ -109,6 +111,12 @@ const Checkout = () => {
     }
     if (!meetsMinimum) {
       toast.error(`Minimum order value is ₹${MIN_ORDER_VALUE.toLocaleString('en-IN')}. Please add more items to your cart.`);
+      return;
+    }
+    // The server needs exactly 10 digits; accept the common "+91 …" and "0…" forms.
+    const phoneDigits = formData.phone.replace(/\D/g, '').replace(/^(91|0)(?=\d{10}$)/, '');
+    if (phoneDigits.length !== 10) {
+      toast.error('Please enter a valid 10-digit mobile number.');
       return;
     }
 
@@ -126,7 +134,7 @@ const Checkout = () => {
           discount_percent: discountPercent,
           expected_total_paise: Math.round(total * 100),
           address: fullAddress,
-          phone: formData.phone,
+          phone: phoneDigits,
         },
       });
 
@@ -167,10 +175,11 @@ const Checkout = () => {
             // Keep the cart until payment succeeds (cleared on the status page).
             window.location.href = `/payment-status?order=${dbOrderId}`;
           } catch (verifyError: unknown) {
+            // Razorpay only calls this handler after the shopper has paid, so a
+            // verification hiccup must not leave a live Pay button (double charge).
+            // The status page keeps polling and the signed webhook can still confirm.
             console.error('Verification error:', verifyError);
-            const message = verifyError instanceof Error ? verifyError.message : 'Payment verification failed. Please contact support.';
-            toast.error(message);
-            setIsSubmitting(false);
+            window.location.href = `/payment-status?order=${dbOrderId}`;
           }
         },
         modal: {
@@ -180,7 +189,7 @@ const Checkout = () => {
         },
         prefill: {
           name: formData.name,
-          contact: formData.phone,
+          contact: phoneDigits,
         },
         notes: {
           address: fullAddress,

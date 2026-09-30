@@ -8,6 +8,7 @@ import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from '@/co
 import { useCart } from '@/contexts/CartContext';
 import { supabase } from '@/integrations/supabase/client';
 import { formatRupees } from '@/lib/money';
+import { handleImageError } from '@/lib/productImages';
 import { filterNonEmptyCategories, productBrowsingCategories } from '@/lib/categories';
 
 const navItems = [
@@ -22,6 +23,7 @@ const navItems = [
 const Navigation = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isMobileShopOpen, setIsMobileShopOpen] = useState(false);
+  const [isShopMenuOpen, setIsShopMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -115,6 +117,8 @@ const Navigation = () => {
 
   // Live Search Effect
   useEffect(() => {
+    // A slow response for an older query must not overwrite newer results.
+    let cancelled = false;
     const searchProducts = async () => {
       if (searchQuery.trim().length < 2) {
         setSearchResults([]);
@@ -126,10 +130,11 @@ const Navigation = () => {
       const { data, error } = await supabase
         .from('products')
         .select('id, name, image_url, images, price')
-        .ilike('name', `%${searchQuery}%`)
+        .ilike('name', `%${searchQuery.trim()}%`)
         .eq('is_active', true)
         .limit(5);
 
+      if (cancelled) return;
       if (!error && data) {
         setSearchResults(data);
       }
@@ -137,13 +142,18 @@ const Navigation = () => {
     };
 
     const debounceTimer = setTimeout(searchProducts, 300);
-    return () => clearTimeout(debounceTimer);
+    return () => {
+      cancelled = true;
+      clearTimeout(debounceTimer);
+    };
   }, [searchQuery]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (searchQuery.trim()) {
-      navigate('/shop', { state: { search: searchQuery } });
+      // Keep the term in the URL (not router state) so Shop preserves it when
+      // filters change; router state is dropped by every filter update.
+      navigate(`/shop?search=${encodeURIComponent(searchQuery.trim())}`);
       setShowDropdown(false);
       if (isMobileMenuOpen) setIsMobileMenuOpen(false);
     }
@@ -193,7 +203,7 @@ const Navigation = () => {
                 </Link>
               ))}
               {/* Shop Dropdown */}
-              <DropdownMenu>
+              <DropdownMenu open={isShopMenuOpen} onOpenChange={setIsShopMenuOpen}>
                 <DropdownMenuTrigger className="flex items-center space-x-1 text-gray-700 hover:text-primary font-medium px-2 py-2 rounded-md hover:bg-primary/5 transition-all duration-200">
                   <span>Shop</span>
                   <ChevronDown className="h-4 w-4 transition-transform duration-200" />
@@ -209,7 +219,10 @@ const Navigation = () => {
                       <div key={categoryName} className="rounded-xl p-3 hover:bg-gray-50">
                         <div 
                           className="font-semibold text-gray-900 px-2 py-2 text-sm border-b border-gray-100 mb-2 cursor-pointer hover:text-primary"
-                          onClick={() => navigate(`/shop?category=${encodeURIComponent(group.root.slug || categoryName)}`)}
+                          onClick={() => {
+                            navigate(`/shop?category=${encodeURIComponent(group.root.slug || categoryName)}`);
+                            setIsShopMenuOpen(false);
+                          }}
                         >
                           {categoryName}
                         </div>
@@ -269,7 +282,7 @@ const Navigation = () => {
                             onClick={() => handleProductClick(product.id)}
                             className="flex items-center gap-3 p-3 hover:bg-gray-50 cursor-pointer transition-colors"
                           >
-                            <img src={getProductImage(product)} alt={product.name} className="w-10 h-10 rounded object-cover border border-gray-100" />
+                            <img src={getProductImage(product)} alt={product.name} onError={handleImageError} className="w-10 h-10 rounded object-cover border border-gray-100" />
                             <div className="flex-1 min-w-0">
                               <p className="text-sm font-medium text-gray-900 truncate">{product.name}</p>
                               <p className="text-xs font-bold text-primary">₹{formatRupees(product.price)}</p>
@@ -363,7 +376,7 @@ const Navigation = () => {
                                 onClick={() => handleProductClick(product.id)}
                                 className="flex items-center gap-3 p-3 hover:bg-gray-50 cursor-pointer"
                               >
-                                <img src={getProductImage(product)} alt={product.name} className="w-10 h-10 rounded object-cover" />
+                                <img src={getProductImage(product)} alt={product.name} onError={handleImageError} className="w-10 h-10 rounded object-cover" />
                                 <div className="flex-1 min-w-0">
                                   <p className="text-sm font-medium text-gray-900 truncate">{product.name}</p>
                                   <p className="text-xs font-bold text-primary">₹{formatRupees(product.price)}</p>

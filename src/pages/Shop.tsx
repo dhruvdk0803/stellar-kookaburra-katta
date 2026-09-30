@@ -24,6 +24,8 @@ async function fetchAllProducts(): Promise<any[]> {
       .from('products')
       .select('*, categories(name, slug, parent_id), brands(name, slug)')
       .eq('is_active', true)
+      // Stable order: range pages over an unordered query can repeat or skip rows.
+      .order('id')
       .range(from, from + PAGE - 1);
     if (error) throw error;
     if (!data || data.length === 0) break;
@@ -92,37 +94,45 @@ const Shop = () => {
 
   // Fetch products and categories from Supabase
   useEffect(() => {
+    let active = true;
     const fetchData = async () => {
       setLoading(true);
-      
-      const [prodRes, catRes] = await Promise.all([
-        // Paged fetch (see fetchAllProducts) — a single request caps at 1000
-        // rows server-side, which would silently hide everything past #1000.
-        fetchAllProducts(),
-        supabase.from('categories').select('*')
-      ]);
 
-      if (prodRes) {
-        setAllProducts(prodRes);
-        setFilteredProducts(prodRes);
-        // Raise the default price ceiling to cover the whole catalog instead
-        // of the old hard-coded ₹10,000 cap.
-        const maxPrice = prodRes.reduce((m, p) => Math.max(m, Number(p.price) || 0), 0);
-        const roundedMax = Math.ceil(maxPrice / 1000) * 1000;
-        setPriceMax(roundedMax);
-        setFilters(prev => (prev.price[1] >= roundedMax ? prev : { ...prev, price: [prev.price[0], roundedMax] }));
+      try {
+        const [prodRes, catRes] = await Promise.all([
+          // Paged fetch (see fetchAllProducts) — a single request caps at 1000
+          // rows server-side, which would silently hide everything past #1000.
+          fetchAllProducts(),
+          supabase.from('categories').select('*')
+        ]);
+        if (!active) return;
+
+        if (prodRes) {
+          setAllProducts(prodRes);
+          setFilteredProducts(prodRes);
+          // Raise the default price ceiling to cover the whole catalog instead
+          // of the old hard-coded ₹10,000 cap.
+          const maxPrice = prodRes.reduce((m, p) => Math.max(m, Number(p.price) || 0), 0);
+          const roundedMax = Math.ceil(maxPrice / 1000) * 1000;
+          setPriceMax(roundedMax);
+          setFilters(prev => (prev.price[1] >= roundedMax ? prev : { ...prev, price: [prev.price[0], roundedMax] }));
+        }
+        if (catRes.data) {
+          setCategories(catRes.data);
+        }
+      } catch (error) {
+        // A failed fetch must not leave the page on an endless spinner.
+        console.error('Failed to load shop catalog', error);
+      } finally {
+        if (active) setLoading(false);
       }
-      if (catRes.data) {
-        setCategories(catRes.data);
-      }
-      
-      setLoading(false);
     };
     fetchData();
+    return () => { active = false; };
   }, []);
 
   const categoriesById = React.useMemo(() => new Map(categories.map((category) => [category.id, category])), [categories]);
-  const searchTerm = location.state?.search || searchParams.get('search') || '';
+  const searchTerm = searchParams.get('search') || location.state?.search || '';
   useEffect(() => {
     setVisibleCount(24);
   }, [filters, sortBy, searchTerm]);
@@ -310,7 +320,7 @@ const Shop = () => {
                 )}
                 {filteredProducts.length === 0 && (
                   <div className="text-center py-12">
-                    <p className="text-gray-500 text-lg">No products found. Try adjusting your filters or add some from the Admin panel.</p>
+                    <p className="text-gray-500 text-lg">No products found. Try adjusting your search or filters.</p>
                   </div>
                 )}
               </>

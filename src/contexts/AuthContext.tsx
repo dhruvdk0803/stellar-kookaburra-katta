@@ -33,10 +33,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [profile, setProfile] = useState<Profile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const activeUserId = useRef<string | null>(null);
+  const profileLoadedFor = useRef<string | null>(null);
 
   useEffect(() => {
     let receivedAuthEvent = false;
     const applySession = (session: Session | null) => {
+      // supabase-js re-emits SIGNED_IN on every tab refocus and TOKEN_REFRESHED
+      // hourly. For a user whose profile is already loaded, just swap in the new
+      // session: resetting the profile / loading flag would blank the checkout
+      // and admin screens and discard their unsaved UI state.
+      if (session?.user && profileLoadedFor.current === session.user.id) {
+        setSession(session);
+        setUser(session.user);
+        return;
+      }
+      profileLoadedFor.current = null;
       activeUserId.current = session?.user.id || null;
       setSession(session);
       setUser(session?.user ?? null);
@@ -78,6 +89,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .single();
       
       if (activeUserId.current === userId && !error && data) {
+        profileLoadedFor.current = userId;
         setProfile(data as Profile);
       }
     } catch (error) {
