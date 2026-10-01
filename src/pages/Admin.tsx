@@ -15,6 +15,7 @@ import { Loader2, LogOut, Package, Tags, ShoppingBag, Edit2, Trash2, X, DollarSi
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
 import { ensureBrandPrefix, stripKnownBrandPrefix } from '@/lib/catalog';
 import { getSavedVariantImage } from '@/lib/productImages';
+import { SpecRow, mergeSpecsForSave, splitSpecsForEditing, validateSpecRows } from '@/lib/specs';
 
 type ProductVariant = {
   _editorKey?: string;
@@ -230,6 +231,10 @@ const Admin = () => {
   const [prodImages, setProdImages] = useState<string[]>([]);
   const [prodVariants, setProdVariants] = useState<ProductVariant[]>([]);
   const [prodVariantType, setProdVariantType] = useState('size');
+  // Customer-facing specifications are edited as rows; internal entries (batch tags,
+  // tax) are held aside and written back unchanged so a save never drops them.
+  const [prodSpecs, setProdSpecs] = useState<SpecRow[]>([]);
+  const [prodPreservedSpecs, setProdPreservedSpecs] = useState<Record<string, unknown>>({});
   const [isUploadingImages, setIsUploadingImages] = useState(false);
   const [isSavingProduct, setIsSavingProduct] = useState(false);
   const [isUploadingBulk, setIsUploadingBulk] = useState(false);
@@ -410,8 +415,14 @@ const Admin = () => {
   // --- Product Actions ---
   const resetProductForm = () => {
     setProdName(''); setProdPrice(''); setProdDesc(''); setProdCat(''); setProdBrand(''); setShowAllProductCategories(false); setProdStock('100'); setProdIsActive(true); setProdImages([]); setProdVariants([]); setProdVariantType('size');
+    setProdSpecs([]); setProdPreservedSpecs({});
     setEditingProductId(null);
   };
+
+  const addSpecRow = () => setProdSpecs((rows) => [...rows, { _key: createVariantEditorKey(), label: '', value: '' }]);
+  const changeSpecRow = (key: string, field: 'label' | 'value', value: string) =>
+    setProdSpecs((rows) => rows.map((row) => (row._key === key ? { ...row, [field]: value } : row)));
+  const removeSpecRow = (key: string) => setProdSpecs((rows) => rows.filter((row) => row._key !== key));
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -485,6 +496,8 @@ const Admin = () => {
       toast.error('Stock must be a whole number equal to or greater than zero.');
       return;
     }
+    const specsError = validateSpecRows(prodSpecs, Object.keys(prodPreservedSpecs));
+    if (specsError) { toast.error(specsError); return; }
     const defaultIndex = prodVariants.findIndex((variant) => variant.is_default);
     const variants = prodVariants.map((variant, index) => {
       const savedVariant = { ...variant };
@@ -518,7 +531,8 @@ const Admin = () => {
       is_active: prodIsActive,
       images: prodImages,
       image_url: prodImages.length > 0 ? prodImages[0] : null,
-      variants
+      variants,
+      specs: mergeSpecsForSave(prodSpecs, prodPreservedSpecs),
     };
 
     setIsSavingProduct(true);
@@ -547,7 +561,10 @@ const Admin = () => {
     setShowAllProductCategories(false);
     setProdStock(product.stock?.toString() || '0');
     setProdIsActive(product.is_active !== false);
-    
+    const { editable: editableSpecs, preserved: preservedSpecs } = splitSpecsForEditing(product.specs, createVariantEditorKey);
+    setProdSpecs(editableSpecs);
+    setProdPreservedSpecs(preservedSpecs);
+
     let imgs = Array.isArray(product.images) ? product.images : [];
     if (imgs.length === 0 && product.image_url) imgs = [product.image_url];
     // Older catalog rows may keep option photos outside the gallery. Surface
@@ -1141,7 +1158,39 @@ const Admin = () => {
                         </div>
                       )}
                       <Textarea placeholder="Description" value={prodDesc} onChange={(e) => setProdDesc(e.target.value)} rows={3} />
-                      
+
+                      {/* Specifications */}
+                      <div className="space-y-3 rounded-xl border border-gray-200 bg-gray-50/50 p-4">
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                          <div>
+                            <p className="text-sm font-semibold text-gray-800">Specifications</p>
+                            <p className="text-xs text-gray-600">Shown to customers on the product page, e.g. Material → Stainless steel. If you leave this empty, the page shows the brand, category and sizes automatically.</p>
+                          </div>
+                          <Button type="button" variant="outline" onClick={addSpecRow} className="shrink-0 bg-white">Add specification</Button>
+                        </div>
+                        {prodSpecs.map((row, index) => (
+                          <div key={row._key} className="flex items-start gap-2 rounded-lg border border-gray-200 bg-white p-2">
+                            <div className="grid min-w-0 flex-1 gap-2 sm:grid-cols-2">
+                              <Input
+                                placeholder="Name, e.g. Material"
+                                aria-label={`Specification ${index + 1} name`}
+                                value={row.label}
+                                onChange={(e) => changeSpecRow(row._key, 'label', e.target.value)}
+                              />
+                              <Input
+                                placeholder="Value, e.g. Stainless steel"
+                                aria-label={`Specification ${index + 1} value`}
+                                value={row.value}
+                                onChange={(e) => changeSpecRow(row._key, 'value', e.target.value)}
+                              />
+                            </div>
+                            <Button type="button" variant="ghost" size="icon" onClick={() => removeSpecRow(row._key)} aria-label={`Remove specification ${index + 1}`} className="shrink-0 text-red-600 hover:bg-red-50 hover:text-red-700">
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+
                       {/* Image Upload Section */}
                       <div className="space-y-3 border border-gray-200 rounded-xl p-4 bg-gray-50/50">
                         <div className="flex items-center justify-between">

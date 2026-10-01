@@ -38,6 +38,12 @@ async function fetchAllProducts(): Promise<any[]> {
 
 const normalizeFilterValue = (value: unknown) => String(value || '').toLowerCase().trim();
 
+// Category slugs retired when Ebco's hinges were merged into Furniture Fitting > Hinges.
+// Old bookmarks and shared links keep landing on the right products.
+const LEGACY_CATEGORY_SLUGS = new Map([['ebco-hinges', 'hinges']]);
+const categoriesFromParams = (params: URLSearchParams) =>
+  params.getAll('category').map((slug) => LEGACY_CATEGORY_SLUGS.get(slug) ?? slug);
+
 interface ProductCategoryFacet {
   id: string;
   name: string;
@@ -83,7 +89,7 @@ const Shop = () => {
   // clean step, so premium items (e.g. digital locks) are never filtered out.
   const [priceMax, setPriceMax] = useState(10000);
   const [filters, setFilters] = useState(() => {
-    const categoriesFromUrl = searchParams.getAll('category');
+    const categoriesFromUrl = categoriesFromParams(searchParams);
     const brandsFromUrl = searchParams.getAll('brand');
     return {
       category: categoriesFromUrl.length > 0 ? categoriesFromUrl : [],
@@ -195,7 +201,7 @@ const Shop = () => {
 
   // Sync URL params to state on initial load or URL change
   useEffect(() => {
-    const categoriesFromUrl = searchParams.getAll('category');
+    const categoriesFromUrl = categoriesFromParams(searchParams);
     const brandsFromUrl = searchParams.getAll('brand');
     setFilters(prevFilters => {
       if (JSON.stringify(prevFilters.category) === JSON.stringify(categoriesFromUrl) && JSON.stringify(prevFilters.brand) === JSON.stringify(brandsFromUrl)) return prevFilters;

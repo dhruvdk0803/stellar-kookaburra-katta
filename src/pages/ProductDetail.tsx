@@ -17,6 +17,7 @@ import { toast } from 'sonner';
 import { stripKnownBrandPrefix } from '@/lib/catalog';
 import { formatRupees } from '@/lib/money';
 import { getProductImages, getVariantDisplayImage, handleImageError } from '@/lib/productImages';
+import { buildFallbackSpecs, getCustomerFacingSpecs } from '@/lib/specs';
 
 type ProductVariant = {
   label: string;
@@ -179,27 +180,18 @@ const ProductDetail = () => {
         .trim()
     : '';
   
-  const specs = product.specs || {
-    'Category': categoryName,
-    'Stock Status': product.stock > 0 ? 'In Stock' : 'Out of Stock',
-    'Material': 'Premium Quality'
-  };
-  // Internal bookkeeping and tax keys are never customer-facing — hide them from
-  // the specs table: 'Source' (seed-script batch tag), 'Demo Video', 'Special
-  // Notes' (owner-internal notes), and any GST key/value.
-  const customerFacingSpecs = Object.fromEntries(
-    Object.entries(specs).filter(([key, value]) =>
-      !['Source', 'Demo Video', 'Special Notes'].includes(key) &&
-      !/\bgst\b/i.test(key) &&
-      !/\bgst\b/i.test(String(value))
-    )
-  );
-
   const averageRating = reviews.length > 0 
     ? (reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length).toFixed(1) 
     : 0;
 
   const variants = getProductVariants(product);
+  // Internal bookkeeping and tax keys are filtered out (see lib/specs). A product
+  // saved with no specs of its own (`{}`) shows the facts it already carries
+  // instead of an empty box.
+  const savedSpecs = getCustomerFacingSpecs(product.specs);
+  const displaySpecs = savedSpecs.length > 0
+    ? savedSpecs
+    : buildFallbackSpecs({ brandName: product.brands?.name, categoryName, variants });
   const activeVariant = variants[selectedVariant];
   const displayPrice = activeVariant?.price ?? product.price;
   const variantType = variants[0]?.type?.toLowerCase();
@@ -344,14 +336,16 @@ const ProductDetail = () => {
             </p>
 
             {/* Quick Specs */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mb-6 bg-gray-50 p-4 rounded-xl">
-              {Object.entries(customerFacingSpecs).map(([key, value]) => (
-                <div key={key} className="text-sm flex flex-col border-b sm:border-0 border-gray-200 pb-2 sm:pb-0 last:border-0 last:pb-0">
-                  <span className="font-semibold text-gray-700">{key}</span>
-                  <span className="text-gray-600 mt-0.5">{value as string}</span>
-                </div>
-              ))}
-            </div>
+            {displaySpecs.length > 0 && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mb-6 bg-gray-50 p-4 rounded-xl">
+                {displaySpecs.map(([key, value]) => (
+                  <div key={key} className="text-sm flex flex-col border-b sm:border-0 border-gray-200 pb-2 sm:pb-0 last:border-0 last:pb-0">
+                    <span className="font-semibold text-gray-700">{key}</span>
+                    <span className="text-gray-600 mt-0.5">{value}</span>
+                  </div>
+                ))}
+              </div>
+            )}
 
             <div className="flex items-center space-x-4 mb-6">
               <label htmlFor="product-quantity" className="text-sm font-medium text-gray-700">Quantity:</label>
@@ -399,14 +393,18 @@ const ProductDetail = () => {
                 <p className="text-gray-700 font-poppins leading-relaxed whitespace-pre-wrap text-sm sm:text-base">{displayDescription || 'No description available.'}</p>
               </TabsContent>
               <TabsContent value="specs" className="mt-0">
-                <ul className="space-y-3">
-                  {Object.entries(customerFacingSpecs).map(([key, value]) => (
-                    <li key={key} className="flex flex-col sm:flex-row sm:justify-between text-sm border-b border-gray-100 pb-3 last:border-0 last:pb-0 gap-1">
-                      <span className="font-medium text-gray-700">{key}</span>
-                      <span className="text-gray-600 sm:text-right">{value as string}</span>
-                    </li>
-                  ))}
-                </ul>
+                {displaySpecs.length > 0 ? (
+                  <ul className="space-y-3">
+                    {displaySpecs.map(([key, value]) => (
+                      <li key={key} className="flex flex-col sm:flex-row sm:justify-between text-sm border-b border-gray-100 pb-3 last:border-0 last:pb-0 gap-1">
+                        <span className="font-medium text-gray-700">{key}</span>
+                        <span className="text-gray-600 sm:text-right">{value}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-sm text-gray-500">Specifications for this product are being updated.</p>
+                )}
               </TabsContent>
               <TabsContent value="reviews" className="mt-0 space-y-8">
                 

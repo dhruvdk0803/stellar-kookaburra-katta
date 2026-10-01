@@ -22,13 +22,19 @@ const directCategoryConfig = [
   { slug: 'louvers-panels', label: 'Louvers & Wall Panels' },
   { slug: 'apollo-cpvc-fittings-pipes', label: 'CPVC Pipes & Fittings' },
   { slug: 'apollo-upvc-pipes-fittings', label: 'uPVC & SWR Pipes' },
-  { slug: 'ebco-hinges', label: 'Hinges' },
-  { slug: 'ebco-drawer-slides', label: 'Drawer Slides' },
+  // Hinges, drawer slides, lift-ups and sliding channels all live under this one parent.
+  { slug: 'furniture-fitting', label: 'Furniture Fitting' },
   { slug: 'ebco-digital-locks', label: 'Digital Locks' },
   { slug: 'jivanjor-adhesives', label: 'Adhesives' },
   { slug: 'doorskin-rockstar', label: 'Decorative Doorskins' },
   { slug: 'flexible-interlocking', label: 'Flexible Wall Panels' },
 ] as const;
+
+// Cover photos for cards where the automatically picked product photo is not
+// representative. A photo the admin sets on the category itself always wins.
+const categoryCoverImages: Record<string, string> = {
+  'furniture-fitting': '/images/categories/furniture-fitting.jpg',
+};
 
 const HomeCatalogPremium = () => {
   const [categories, setCategories] = useState<CategoryCard[]>([]);
@@ -73,7 +79,7 @@ const HomeCatalogPremium = () => {
       return [{
         ...category,
         displayName: label,
-        thumbnail_url: category.thumbnail_url || fallbackImage,
+        thumbnail_url: category.image_url || categoryCoverImages[slug] || category.thumbnail_url || fallbackImage,
       }];
     });
   }, [categories]);
