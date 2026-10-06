@@ -16,6 +16,7 @@ const PrivacyPolicy = () => {
             <section>
               <h2 className="text-2xl font-semibold text-gray-900 mb-4">1. Information We Collect</h2>
               <p>We collect information that you provide directly to us. For example, we collect information when you create an account, place an order, subscribe to our newsletter, or communicate with us. The types of information we may collect include your name, email address, postal address, phone number, and payment information.</p>
+              <p className="mt-4">At checkout you may optionally share your exact delivery location by using your device's location or placing a pin on a map. We use it only to help deliver your order. To show a readable address for the pin, its coordinates are sent to OpenStreetMap's address lookup service. You can always skip this step and provide your address only.</p>
             </section>
 
             <section>

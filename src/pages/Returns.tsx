@@ -11,6 +11,8 @@ const Returns = () => {
           <h1 className="text-3xl sm:text-4xl font-playfair font-bold text-gray-900 mb-8">Returns & Refunds</h1>
           
           <div className="space-y-8 text-gray-700 leading-relaxed">
+            <p>Some products list their own return and replacement terms in the Returns &amp; Replacement section of their product page. Where a product lists its own terms, those apply to that product. Everything below is our store-wide policy.</p>
+
             <section>
               <h2 className="text-2xl font-semibold text-gray-900 mb-4">1. Return Window</h2>
               <p>Eligible items can be returned within 2 days of delivery if they are unused, in their original condition, and in their original packaging. Doorskins, wall panels, laminates, and digital locks are excluded from this return policy.</p>

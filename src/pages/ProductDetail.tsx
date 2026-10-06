@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { ShoppingCart, Heart, MessageCircle, Loader2, Star, ShieldCheck, Share2 } from 'lucide-react';
 import { shareProduct } from '@/lib/share';
 import Navigation from '@/components/Navigation';
@@ -15,9 +16,11 @@ import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { stripKnownBrandPrefix } from '@/lib/catalog';
+import { productCategoryLabel } from '@/lib/categories';
 import { formatRupees } from '@/lib/money';
 import { getProductImages, getVariantDisplayImage, handleImageError } from '@/lib/productImages';
 import { buildFallbackSpecs, getCustomerFacingSpecs } from '@/lib/specs';
+import { getProductPolicies } from '@/lib/policies';
 
 type ProductVariant = {
   label: string;
@@ -169,7 +172,8 @@ const ProductDetail = () => {
   }
 
   const allImages = getProductImages(product);
-  const categoryName = product.categories?.name || product.subcategory || 'Uncategorized';
+  const rawCategoryName = product.categories?.name || product.subcategory || 'Uncategorized';
+  const categoryName = productCategoryLabel(rawCategoryName) || rawCategoryName;
   // GST remains stored with the product for administration and order records, but
   // tax details are not displayed to customers on product pages.
   const displayDescription = typeof product.description === 'string'
@@ -192,6 +196,10 @@ const ProductDetail = () => {
   const displaySpecs = savedSpecs.length > 0
     ? savedSpecs
     : buildFallbackSpecs({ brandName: product.brands?.name, categoryName, variants });
+  // The product's own return/replacement text, else the store-wide wording. The
+  // columns are missing on a database that has not run the policy migration yet;
+  // that just means the defaults are shown.
+  const policies = getProductPolicies(product);
   const activeVariant = variants[selectedVariant];
   const displayPrice = activeVariant?.price ?? product.price;
   const variantType = variants[0]?.type?.toLowerCase();
@@ -371,13 +379,37 @@ const ProductDetail = () => {
               </Button>
             </div>
 
-            {/* Return Policy Notice */}
-            <div className="flex items-start gap-3 bg-green-50/50 border border-green-100 p-4 rounded-xl mt-4">
-              <ShieldCheck className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
-              <p className="text-sm text-gray-700">
-                <span className="font-semibold text-gray-900">Return Policy:</span> Eligible items may be returned within 2 days of delivery. Doorskins, wall panels, laminates, and digital locks are excluded. <Link to="/returns" className="font-medium underline underline-offset-2">See full policy</Link>.
-              </p>
-            </div>
+            {/* Returns & Replacement: the product's own policy text, else store-wide wording */}
+            <Accordion type="single" collapsible className="mt-4">
+              <AccordionItem value="returns-replacement" className="rounded-xl border border-green-100 bg-green-50/50 px-4">
+                <AccordionTrigger className="py-3 text-left hover:no-underline">
+                  <span className="flex min-w-0 items-start gap-3 pr-2">
+                    <ShieldCheck className="mt-0.5 h-5 w-5 flex-shrink-0 text-green-600" />
+                    <span className="flex min-w-0 flex-col">
+                      <span className="text-sm font-semibold text-gray-900">Returns &amp; Replacement</span>
+                      <span className="text-xs font-normal text-gray-600">
+                        {policies.hasProductSpecificReturn || policies.hasProductSpecificReplacement
+                          ? 'Return and replacement terms for this product'
+                          : 'Return window and what to do if an item arrives damaged'}
+                      </span>
+                    </span>
+                  </span>
+                </AccordionTrigger>
+                <AccordionContent className="space-y-4 border-t border-green-100 pt-4 text-gray-700">
+                  <section aria-labelledby="return-policy-heading">
+                    <h3 id="return-policy-heading" className="text-sm font-semibold text-gray-900">Return Policy</h3>
+                    <p className="mt-1 whitespace-pre-line text-sm leading-relaxed [overflow-wrap:anywhere]">{policies.returnPolicy}</p>
+                  </section>
+                  <section aria-labelledby="replacement-policy-heading">
+                    <h3 id="replacement-policy-heading" className="text-sm font-semibold text-gray-900">Replacement Policy</h3>
+                    <p className="mt-1 whitespace-pre-line text-sm leading-relaxed [overflow-wrap:anywhere]">{policies.replacementPolicy}</p>
+                  </section>
+                  <p className="text-sm">
+                    <Link to="/returns" className="font-medium text-gray-900 underline underline-offset-2">See our full Returns &amp; Refunds policy</Link>
+                  </p>
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
           </div>
         </div>
 
@@ -385,15 +417,17 @@ const ProductDetail = () => {
           <Tabs defaultValue="description" className="w-full">
             <TabsList className="flex w-full overflow-x-auto h-auto gap-2 bg-transparent justify-start pb-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
               <TabsTrigger value="description" className="flex-shrink-0 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full py-2 px-5 border border-gray-200 data-[state=active]:border-primary text-sm">Description</TabsTrigger>
-              <TabsTrigger value="specs" className="flex-shrink-0 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full py-2 px-5 border border-gray-200 data-[state=active]:border-primary text-sm">Specs</TabsTrigger>
+              {displaySpecs.length > 0 && (
+                <TabsTrigger value="specs" className="flex-shrink-0 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full py-2 px-5 border border-gray-200 data-[state=active]:border-primary text-sm">Specs</TabsTrigger>
+              )}
               <TabsTrigger value="reviews" className="flex-shrink-0 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full py-2 px-5 border border-gray-200 data-[state=active]:border-primary text-sm">Reviews ({reviews.length})</TabsTrigger>
             </TabsList>
             <div className="bg-white border border-gray-100 rounded-2xl p-4 sm:p-6 mt-4 shadow-sm">
               <TabsContent value="description" className="mt-0">
                 <p className="text-gray-700 font-poppins leading-relaxed whitespace-pre-wrap text-sm sm:text-base">{displayDescription || 'No description available.'}</p>
               </TabsContent>
-              <TabsContent value="specs" className="mt-0">
-                {displaySpecs.length > 0 ? (
+              {displaySpecs.length > 0 && (
+                <TabsContent value="specs" className="mt-0">
                   <ul className="space-y-3">
                     {displaySpecs.map(([key, value]) => (
                       <li key={key} className="flex flex-col sm:flex-row sm:justify-between text-sm border-b border-gray-100 pb-3 last:border-0 last:pb-0 gap-1">
@@ -402,10 +436,8 @@ const ProductDetail = () => {
                       </li>
                     ))}
                   </ul>
-                ) : (
-                  <p className="text-sm text-gray-500">Specifications for this product are being updated.</p>
-                )}
-              </TabsContent>
+                </TabsContent>
+              )}
               <TabsContent value="reviews" className="mt-0 space-y-8">
                 
                 {/* Write a Review Form */}

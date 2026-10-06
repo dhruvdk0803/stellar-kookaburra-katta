@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { ArrowRight, Loader2, PackageSearch } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
+import BrandLogo from '@/components/BrandLogo';
 import { Brand, CategoryCard, brandShopUrl, categoryShopUrl, stripKnownBrandPrefix } from '@/lib/catalog';
 import { formatRupees } from '@/lib/money';
 
@@ -20,7 +21,9 @@ interface ShelfProduct {
 const directCategoryConfig = [
   { slug: 'sunmica', label: 'Laminates & Sunmica' },
   { slug: 'louvers-panels', label: 'Louvers & Wall Panels' },
-  { slug: 'apollo-cpvc-fittings-pipes', label: 'CPVC Pipes & Fittings' },
+  // Renamed by the client to "CPVC and UPVC Fittings"; the database rows carry the same name.
+  // The slug keeps its original spelling so existing links keep working.
+  { slug: 'apollo-cpvc-fittings-pipes', label: 'CPVC and UPVC Fittings' },
   { slug: 'apollo-upvc-pipes-fittings', label: 'uPVC & SWR Pipes' },
   // Hinges, drawer slides, lift-ups and sliding channels all live under this one parent.
   { slug: 'furniture-fitting', label: 'Furniture Fitting' },
@@ -31,7 +34,9 @@ const directCategoryConfig = [
 ] as const;
 
 // Cover photos for cards where the automatically picked product photo is not
-// representative. A photo the admin sets on the category itself always wins.
+// representative. A photo the admin sets on the category itself always wins; the
+// catalog migration also stores this one on the Furniture Fitting row, and this
+// map keeps the card correct if that column is ever emptied.
 const categoryCoverImages: Record<string, string> = {
   'furniture-fitting': '/images/categories/furniture-fitting.jpg',
 };
@@ -183,10 +188,11 @@ const HomeCatalogPremium = () => {
             <p className="text-sm font-medium text-[#17201d]">Brands professionals trust</p>
             <Link to="/shop" className="text-xs font-medium text-[#8b7655] hover:underline">Shop all brands</Link>
           </div>
-          <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-7">
-            {brands.slice(0, 7).map((brand) => (
-              <Link key={brand.id} to={brandShopUrl(brand.slug)} className="flex h-24 items-center justify-center rounded-xl border border-[#d8d2c7] bg-white p-3 shadow-sm transition hover:-translate-y-0.5 hover:border-[#9b8e78] hover:shadow-md">
-                {brand.logo_url ? <img src={brand.logo_url} alt={`${brand.name} logo`} loading="lazy" className="max-h-14 w-full object-contain" /> : <span className="text-sm font-semibold text-[#17201d]">{brand.name}</span>}
+          {/* Every brand with live products is shown: capping the list silently dropped the last one alphabetically. */}
+          <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 xl:grid-cols-8">
+            {brands.map((brand) => (
+              <Link key={brand.id} to={brandShopUrl(brand.slug)} aria-label={brand.name} className="flex h-24 items-center justify-center rounded-xl border border-[#d8d2c7] bg-white p-3 shadow-sm transition hover:-translate-y-0.5 hover:border-[#9b8e78] hover:shadow-md">
+                <BrandLogo name={brand.name} logoUrl={brand.logo_url} className="max-h-14 w-full" />
               </Link>
             ))}
           </div>

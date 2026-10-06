@@ -6,6 +6,9 @@ export interface CategoryRow {
 
 // These names identify manufacturers or product ranges. They can appear in
 // legacy category labels, but customers should find them through Brand filters.
+// Thermoluxe and IRIS are Gloirio ranges, not brands any more. They stay in
+// this list on purpose: category rows such as "1.3mm - Thermoluxe" still exist,
+// and listing the names here is what keeps them out of the customer-facing label.
 const BRAND_LABELS = [
   'Thermoluxe', 'Astral', 'Astra', 'Apollo', 'Ebco', 'Jivanjor',
   'Rockstar', 'Gloirio', 'Glorio', 'IRIS', 'Rang',
@@ -19,6 +22,72 @@ export const productCategoryLabel = (name: string): string =>
     .replace(/[–—|]+/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
+
+// Old shop links that must keep landing on the right products after a category
+// was merged or renamed. Keys are lower-case; values are the current category
+// slug. Slugs never change when a category is renamed, so only a retired slug
+// or the old *label* (links built from the name) needs an entry here.
+const LEGACY_CATEGORY_ALIASES: ReadonlyMap<string, string> = new Map([
+  // Ebco's own "Hinges" category was merged into Furniture Fitting > Hinges.
+  ['ebco-hinges', 'hinges'],
+  // "CPVC Fittings & Pipes" (Apollo) and "CPVC Pipes & Fittings" (Astral, and
+  // the old homepage card) were renamed "CPVC and UPVC Fittings". The Apollo
+  // row is the stocked one, so name-based links resolve to its (unchanged) slug.
+  ['cpvc fittings & pipes', 'apollo-cpvc-fittings-pipes'],
+  ['cpvc pipes & fittings', 'apollo-cpvc-fittings-pipes'],
+]);
+
+/** Maps a retired category slug or label from an old link to the current slug; anything else is returned unchanged. */
+export const resolveLegacyCategoryAlias = (value: string): string =>
+  LEGACY_CATEGORY_ALIASES.get(String(value ?? '').trim().toLowerCase()) ?? value;
+
+/** The `category` values of a shop URL, with retired slugs and labels resolved to current ones. */
+export const categorySelectionFromParams = (params: URLSearchParams): string[] =>
+  params.getAll('category').map(resolveLegacyCategoryAlias);
+
+export const normalizeFilterValue = (value: unknown): string => String(value || '').toLowerCase().trim();
+
+export interface ProductCategoryFacet {
+  id: string;
+  name: string;
+  slug?: string | null;
+  parent_id?: string | null;
+}
+
+interface ProductFacetRow {
+  category_id?: string | null;
+  categories?: ProductCategoryFacet | null;
+}
+
+/**
+ * Every name and slug on the product's category path (its own category, then
+ * each ancestor). A product matches a selected category when that category is
+ * anywhere on this path, so choosing a parent includes all of its descendants.
+ */
+export const getProductCategoryTokens = (
+  product: ProductFacetRow,
+  categoriesById: Map<string, ProductCategoryFacet>,
+): Set<string> => {
+  const tokens = new Set<string>();
+  let category = categoriesById.get(product.category_id as string) || product.categories;
+  let guard = 0;
+  while (category && guard++ < 20) {
+    if (category.name) tokens.add(normalizeFilterValue(category.name));
+    if (category.slug) tokens.add(normalizeFilterValue(category.slug));
+    category = category.parent_id ? categoriesById.get(category.parent_id) : null;
+  }
+  return tokens;
+};
+
+export const productMatchesSelectedCategories = (
+  product: ProductFacetRow,
+  selectedCategories: string[],
+  categoriesById: Map<string, ProductCategoryFacet>,
+): boolean => {
+  if (!selectedCategories.length) return true;
+  const productTokens = getProductCategoryTokens(product, categoriesById);
+  return selectedCategories.some((category) => productTokens.has(normalizeFilterValue(category)));
+};
 
 /**
  * Presents only product categories. If a legacy brand-only category sits

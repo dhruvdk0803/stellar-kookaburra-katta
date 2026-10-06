@@ -10,11 +10,46 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { formatRupees } from '@/lib/money';
+import { formatDiscountPercent } from '@/lib/discounts';
+import { getPaymentMethod, getPaymentMethodLabel, isUpiOnDeliveryOrder, UPI_ON_DELIVERY_DESCRIPTION } from '@/lib/paymentMethods';
+
+interface OrderItemRow {
+  id: string;
+  quantity: number;
+  price: number | string;
+  variant_label?: string | null;
+  product_name_snapshot?: string | null;
+  product_image_snapshot?: string | null;
+  products?: { name?: string | null; image_url?: string | null } | null;
+}
+
+// Columns added by the 2026-10-05 checkout migration are optional: older
+// orders (and databases before the migration) simply don't have them.
+interface OrderRow {
+  id: string;
+  created_at: string;
+  status: string;
+  total_amount: number | string;
+  inventory_issue?: boolean | null;
+  payment_method?: string | null;
+  payment_provider?: string | null;
+  subtotal_amount?: number | string | null;
+  discount_percent?: number | string | null;
+  discount_amount?: number | string | null;
+  shipping_amount?: number | string | null;
+  order_items?: OrderItemRow[] | null;
+}
+
+const toAmount = (value: unknown): number | null => {
+  if (value === null || value === undefined || value === '') return null;
+  const amount = Number(value);
+  return Number.isFinite(amount) ? amount : null;
+};
 
 const Account = () => {
   const { user, profile, signOut, isLoading } = useAuth();
   const navigate = useNavigate();
-  const [orders, setOrders] = useState<any[]>([]);
+  const [orders, setOrders] = useState<OrderRow[]>([]);
   const [loadingOrders, setLoadingOrders] = useState(true);
   
   // Profile Edit States
@@ -172,12 +207,24 @@ const Account = () => {
                 </div>
               ) : (
                 <div className="space-y-6">
-                  {orders.map((order) => (
-                    <div key={order.id} className="border border-gray-100 rounded-2xl p-6 bg-white hover:shadow-md transition-shadow">
+                  {orders.map((order) => {
+                    const hasPaymentMethod = getPaymentMethod(order) !== null;
+                    const awaitingUpiPayment = isUpiOnDeliveryOrder(order) && !['cancelled', 'delivered'].includes(String(order.status).toLowerCase());
+                    const subtotal = toAmount(order.subtotal_amount);
+                    const shipping = toAmount(order.shipping_amount);
+                    const discount = toAmount(order.discount_amount);
+                    const discountPercent = toAmount(order.discount_percent);
+                    const total = toAmount(order.total_amount) ?? 0;
+                    return (
+                    <div key={order.id} className="border border-gray-100 rounded-2xl p-4 sm:p-6 bg-white hover:shadow-md transition-shadow">
                       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">
-                        <div>
+                        <div className="min-w-0">
                           <p className="text-sm text-gray-500">Order ID: <span className="font-mono text-gray-900">{order.id.slice(0, 8)}</span></p>
                           <p className="text-sm text-gray-500">Placed on: {new Date(order.created_at).toLocaleDateString()}</p>
+                          {hasPaymentMethod && (
+                            <p className="text-sm text-gray-500">Payment: <span className="text-gray-900">{getPaymentMethodLabel(order)}</span></p>
+                          )}
+                          {awaitingUpiPayment && <p className="mt-1 text-xs text-gray-500">{UPI_ON_DELIVERY_DESCRIPTION}</p>}
                         </div>
                         <div className="flex items-center space-x-2 bg-gray-50 px-3 py-1.5 rounded-full">
                           {getStatusIcon(order.status)}
@@ -191,33 +238,55 @@ const Account = () => {
                       )}
                       
                       <div className="divide-y divide-gray-50">
-                        {order.order_items?.map((item: any) => (
-                          <div key={item.id} className="py-3 flex items-center justify-between">
-                            <div className="flex items-center space-x-4">
+                        {order.order_items?.map((item) => (
+                          <div key={item.id} className="py-3 flex items-center justify-between gap-3">
+                            <div className="flex min-w-0 items-center space-x-4">
                               <img 
                                 src={item.product_image_snapshot || item.products?.image_url || '/placeholder.svg'}
                                 alt={item.product_name_snapshot || item.products?.name || 'Ordered product'}
-                                className="w-12 h-12 rounded-md object-cover border border-gray-100"
+                                className="w-12 h-12 shrink-0 rounded-md object-cover border border-gray-100"
                               />
-                              <div>
-                                <p className="font-medium text-gray-900">
+                              <div className="min-w-0">
+                                <p className="break-words font-medium text-gray-900">
                                   {item.product_name_snapshot || item.products?.name || 'Unknown Product'}
                                   {item.variant_label ? ` (${item.variant_label})` : ''}
                                 </p>
                                 <p className="text-sm text-gray-500">Qty: {item.quantity}</p>
                               </div>
                             </div>
-                            <p className="font-medium text-gray-900">₹{formatRupees(item.price * item.quantity)}</p>
+                            <p className="shrink-0 font-medium text-gray-900">₹{formatRupees(Number(item.price) * item.quantity)}</p>
                           </div>
                         ))}
                       </div>
-                      
-                      <div className="mt-4 pt-4 border-t border-gray-100 flex justify-between items-center">
-                        <span className="text-gray-600">Total Amount</span>
-                        <span className="text-xl font-bold text-primary">₹{Number(order.total_amount).toFixed(2)}</span>
+
+                      <div className="mt-4 pt-4 border-t border-gray-100 space-y-2">
+                        {/* Breakdown only for orders that stored one (placed after the checkout migration). */}
+                        {subtotal !== null && (
+                          <div className="flex justify-between gap-4 text-sm text-gray-600">
+                            <span>Subtotal</span>
+                            <span className="whitespace-nowrap">₹{formatRupees(subtotal, true)}</span>
+                          </div>
+                        )}
+                        {discount !== null && discount > 0 && (
+                          <div className="flex justify-between gap-4 text-sm font-medium text-emerald-700">
+                            <span>Bulk Purchase Discount{discountPercent ? ` (${formatDiscountPercent(discountPercent)})` : ''}</span>
+                            <span className="whitespace-nowrap">−₹{formatRupees(discount, true)}</span>
+                          </div>
+                        )}
+                        {subtotal !== null && shipping !== null && (
+                          <div className="flex justify-between gap-4 text-sm text-gray-600">
+                            <span>Shipping</span>
+                            <span className="whitespace-nowrap">₹{formatRupees(shipping, true)}</span>
+                          </div>
+                        )}
+                        <div className="flex justify-between items-center gap-4">
+                          <span className="text-gray-600">Total Amount</span>
+                          <span className="whitespace-nowrap text-xl font-bold text-primary">₹{formatRupees(total, true)}</span>
+                        </div>
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </CardContent>

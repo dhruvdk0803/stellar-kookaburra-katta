@@ -6,6 +6,7 @@ import { useCart } from '@/contexts/CartContext';
 import { shareProduct } from '@/lib/share';
 import { cn } from '@/lib/utils';
 import { stripKnownBrandPrefix } from '@/lib/catalog';
+import { productCategoryLabel } from '@/lib/categories';
 import { formatRupees } from '@/lib/money';
 import { getProductPrimaryImage, handleImageError } from '@/lib/productImages';
 
@@ -22,7 +23,9 @@ const ProductCard = ({ product, isInWishlist, onWishlistToggle }: ProductCardPro
 
   const imageUrl = getProductPrimaryImage(product);
     
-  const categoryName = product.categories?.name || product.subcategory || 'Uncategorized';
+  // Same brand-free label the shop filters and menus use (e.g. "1.3mm", not "1.3mm - Thermoluxe").
+  const rawCategoryName = product.categories?.name || product.subcategory || 'Uncategorized';
+  const categoryName = productCategoryLabel(rawCategoryName) || rawCategoryName;
   const brandName = product.brands?.name || product.brand?.name;
   const displayName = brandName ? stripKnownBrandPrefix(product.name, [{ name: brandName }]) : product.name;
 

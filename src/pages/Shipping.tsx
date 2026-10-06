@@ -23,8 +23,9 @@ const Shipping = () => {
             </section>
 
             <section>
-              <h2 className="text-2xl font-semibold text-gray-900 mb-4">3. Minimum Order Value</h2>
-              <p>We accept online orders with a minimum order value of <strong>₹2,000</strong> (excluding shipping charges). Orders below this value cannot be placed through the website — please contact us for smaller requirements.</p>
+              <h2 className="text-2xl font-semibold text-gray-900 mb-4">3. Order Value, Discounts and Payment</h2>
+              <p className="mb-4">There is no minimum order value: you can place an order of any size through the website. Larger orders may qualify for a cart-value discount, which is applied automatically at checkout and shown in your order summary before you pay.</p>
+              <p>You can pay online at checkout (cards, UPI, net banking and wallets via Razorpay) or choose UPI on Delivery and pay via UPI when your order is delivered.</p>
             </section>
 
             <section>

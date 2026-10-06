@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { ArrowRight, Loader2, PackageSearch } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import ProductCard from '@/components/ProductCard';
+import BrandLogo from '@/components/BrandLogo';
 import { supabase } from '@/integrations/supabase/client';
 import { useWishlist } from '@/contexts/WishlistContext';
 import { Brand, CategoryCard, brandShopUrl, categoryShopUrl } from '@/lib/catalog';
@@ -292,11 +293,7 @@ const HomeCatalog = () => {
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-8">
             {brands.map((brand) => (
               <Link key={brand.id} to={brandShopUrl(brand.slug)} className="group flex min-h-32 flex-col items-center justify-center rounded-2xl border border-gray-200 bg-white p-4 text-center shadow-sm transition hover:-translate-y-1 hover:border-gray-300 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
-                {brand.logo_url ? (
-                  <img src={brand.logo_url} alt={`${brand.name} logo`} loading="lazy" className="h-14 w-full object-contain transition group-hover:scale-105" />
-                ) : (
-                  <span className="text-xl font-bold text-gray-900">{brand.name}</span>
-                )}
+                <BrandLogo name={brand.name} logoUrl={brand.logo_url} className="h-14 w-full transition group-hover:scale-105" />
                 <span className="mt-2 text-xs text-gray-500">{brand.product_count} products</span>
               </Link>
             ))}

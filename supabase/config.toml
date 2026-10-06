@@ -8,6 +8,10 @@ verify_jwt = true
 [functions.razorpay-verify]
 verify_jwt = true
 
+# UPI on Delivery order placement — requires a logged-in user (JWT verified by platform).
+[functions.place-upi-order]
+verify_jwt = true
+
 # Razorpay's server-to-server recovery path for payment.captured/order.paid.
 # The function verifies x-razorpay-signature itself using RAZORPAY_WEBHOOK_SECRET.
 [functions.razorpay-webhook]

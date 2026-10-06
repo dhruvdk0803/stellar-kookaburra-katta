@@ -1,5 +1,9 @@
 import React, { createContext, useContext, useReducer, useEffect, useCallback } from 'react';
-import { MAX_CART_DISCOUNT_PERCENT, MIN_CART_DISCOUNT_PERCENT } from '@/lib/constants';
+
+// Storage key of the retired random "surprise discount" (2026-10-05). Cart
+// discounts now come from the server-side discount tiers; any stale value left
+// in a returning shopper's browser is removed once on load.
+const RETIRED_DISCOUNT_STORAGE_KEY = 'katta-cart-discount';
 
 interface CartItem {
   id: string;
@@ -48,17 +52,6 @@ const loadSavedCart = (): CartState => {
   }
 };
 
-const loadSavedDiscount = () => {
-  try {
-    const saved = Number(localStorage.getItem('katta-cart-discount'));
-    return Number.isInteger(saved) && saved >= MIN_CART_DISCOUNT_PERCENT && saved <= MAX_CART_DISCOUNT_PERCENT
-      ? saved
-      : nextDiscountPercent(0);
-  } catch {
-    return nextDiscountPercent(0);
-  }
-};
-
 type CartAction =
   | { type: 'ADD_TO_CART'; item: Omit<CartItem, 'quantity'>; quantity?: number }
   | { type: 'REMOVE_FROM_CART'; id: string }
@@ -103,16 +96,7 @@ const CartContext = createContext<{
   updateQuantity: (id: string, quantity: number) => void;
   clearCart: () => void;
   cartCount: number;
-  discountPercent: number;
 } | null>(null);
-
-const nextDiscountPercent = (current: number) => {
-  const choices = Array.from(
-    { length: MAX_CART_DISCOUNT_PERCENT - MIN_CART_DISCOUNT_PERCENT + 1 },
-    (_, index) => MIN_CART_DISCOUNT_PERCENT + index,
-  ).filter((percent) => percent !== current);
-  return choices[Math.floor(Math.random() * choices.length)];
-};
 
 export const useCart = () => {
   const context = useContext(CartContext);
@@ -124,20 +108,18 @@ export const useCart = () => {
 
 export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [cart, dispatch] = useReducer(cartReducer, [], loadSavedCart);
-  const [discountPercent, setDiscountPercent] = React.useState(loadSavedDiscount);
 
   useEffect(() => {
     try { localStorage.setItem('katta-cart', JSON.stringify(cart)); } catch { /* Storage can be unavailable in private browsing. */ }
   }, [cart]);
 
   useEffect(() => {
-    try { localStorage.setItem('katta-cart-discount', String(discountPercent)); } catch { /* Storage can be unavailable in private browsing. */ }
-  }, [discountPercent]);
+    try { localStorage.removeItem(RETIRED_DISCOUNT_STORAGE_KEY); } catch { /* Storage can be unavailable in private browsing. */ }
+  }, []);
 
   const addToCart = useCallback((item: Omit<CartItem, 'quantity'>, quantity = 1) => {
-    if (cart.length === 0) setDiscountPercent((current) => nextDiscountPercent(current));
     dispatch({ type: 'ADD_TO_CART', item, quantity });
-  }, [cart.length]);
+  }, []);
 
   const removeFromCart = useCallback((id: string) => {
     dispatch({ type: 'REMOVE_FROM_CART', id });
@@ -154,7 +136,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const cartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
 
   return (
-    <CartContext.Provider value={{ cart, addToCart, removeFromCart, updateQuantity, clearCart, cartCount, discountPercent }}>
+    <CartContext.Provider value={{ cart, addToCart, removeFromCart, updateQuantity, clearCart, cartCount }}>
       {children}
     </CartContext.Provider>
   );

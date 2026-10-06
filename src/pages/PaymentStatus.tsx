@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import Navigation from '@/components/Navigation';
 import Footer from '@/components/Footer';
@@ -6,8 +6,16 @@ import { Button } from '@/components/ui/button';
 import { CheckCircle2, XCircle, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useCart } from '@/contexts/CartContext';
+import { formatRupees } from '@/lib/money';
+import { isUpiOnDeliveryOrder, PAYMENT_METHOD_LABELS } from '@/lib/paymentMethods';
 
-type Status = 'checking' | 'success' | 'failed' | 'pending' | 'unconfirmed';
+type Status = 'checking' | 'success' | 'failed' | 'pending' | 'unconfirmed' | 'upi_placed' | 'upi_cancelled';
+
+interface UpiOrderDetails {
+  id: string;
+  total: number | null;
+  address: string | null;
+}
 
 const PaymentStatus = () => {
   const [searchParams] = useSearchParams();
@@ -15,6 +23,8 @@ const PaymentStatus = () => {
   const { clearCart } = useCart();
   const [status, setStatus] = useState<Status>('checking');
   const [inventoryIssue, setInventoryIssue] = useState(false);
+  const [upiOrder, setUpiOrder] = useState<UpiOrderDetails | null>(null);
+  const upiCartClearedRef = useRef(false);
 
   useEffect(() => {
     if (!orderId) {
@@ -23,6 +33,7 @@ const PaymentStatus = () => {
     }
     setStatus('checking');
     setInventoryIssue(false);
+    setUpiOrder(null);
     let cancelled = false;
     let timer: number | undefined;
 
@@ -45,13 +56,37 @@ const PaymentStatus = () => {
       };
 
       try {
+        // '*' (not a column list) so this keeps working before the checkout
+        // migration adds payment_method / the amount breakdown columns.
         const { data, error } = await supabase
           .from('orders')
-          .select('status, payment_status, inventory_issue')
+          .select('*')
           .eq('id', orderId)
           .single();
         if (error) throw error;
         if (cancelled) return;
+
+        // UPI on Delivery: nothing to poll. The order is placed (payment is
+        // collected at delivery), so confirm it straight away.
+        if (data && isUpiOnDeliveryOrder(data)) {
+          const total = Number(data.total_amount);
+          setUpiOrder({
+            id: String(data.id ?? orderId),
+            total: Number.isFinite(total) ? total : null,
+            address: typeof data.address === 'string' && data.address.trim() ? data.address.trim() : null,
+          });
+          setInventoryIssue(data.inventory_issue === true);
+          if (data.status === 'cancelled') {
+            setStatus('upi_cancelled');
+            return;
+          }
+          if (!upiCartClearedRef.current) {
+            upiCartClearedRef.current = true;
+            clearCart();
+          }
+          setStatus('upi_placed');
+          return;
+        }
 
         if (data?.payment_status === 'captured' && ['confirmed', 'processing', 'shipped', 'delivered'].includes(data.status)) {
           clearCart();
@@ -76,11 +111,13 @@ const PaymentStatus = () => {
     };
   }, [orderId, clearCart]);
 
+  const isUpiView = status === 'upi_placed' || status === 'upi_cancelled';
+
   return (
     <div className="min-h-screen bg-white font-poppins flex flex-col">
       <Navigation />
       <div className="flex-1 flex items-center justify-center py-20 px-4">
-        <div className="text-center max-w-md">
+        <div className={isUpiView ? 'w-full max-w-md text-center' : 'text-center max-w-md'}>
           {(status === 'checking' || status === 'pending') && (
             <>
               <Loader2 className="h-14 w-14 text-primary animate-spin mx-auto mb-6" />
@@ -109,6 +146,74 @@ const PaymentStatus = () => {
                   View My Orders
                 </Button>
               </Link>
+            </>
+          )}
+
+          {status === 'upi_placed' && upiOrder && (
+            <>
+              <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                <CheckCircle2 className="h-11 w-11 text-green-600" aria-hidden="true" />
+              </div>
+              <h2 className="text-3xl font-playfair font-bold text-gray-900 mb-3">Order placed</h2>
+              <p className="text-gray-600 mb-6">Thank you for your order. We'll be in touch about delivery.</p>
+              {inventoryIssue && (
+                <p className="mb-6 rounded-lg bg-amber-50 p-3 text-sm text-amber-800">
+                  We are checking availability for part of your order and will contact you with an update.
+                </p>
+              )}
+              <dl className="mb-8 space-y-3 rounded-2xl border border-gray-100 bg-gray-50 p-4 text-left text-sm sm:p-5">
+                <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                  <dt className="text-gray-500">Order number</dt>
+                  <dd className="font-mono font-medium text-gray-900">{upiOrder.id.slice(0, 8)}</dd>
+                </div>
+                {upiOrder.total !== null && (
+                  <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                    <dt className="text-gray-500">Total</dt>
+                    <dd className="text-base font-bold text-gray-900">₹{formatRupees(upiOrder.total, true)}</dd>
+                  </div>
+                )}
+                <div className="border-t border-gray-200 pt-3">
+                  <dt className="text-gray-500">Payment</dt>
+                  <dd className="mt-0.5 break-words font-medium text-gray-900">
+                    {PAYMENT_METHOD_LABELS.upi_on_delivery} - pay via UPI when your order is delivered
+                  </dd>
+                </div>
+                {upiOrder.address && (
+                  <div className="border-t border-gray-200 pt-3">
+                    <dt className="text-gray-500">Delivery address</dt>
+                    <dd className="mt-0.5 break-words text-gray-900">{upiOrder.address}</dd>
+                  </div>
+                )}
+              </dl>
+              <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                <Button asChild className="rounded-full bg-primary hover:bg-primary/90 text-primary-foreground px-8 py-6 w-full sm:w-auto">
+                  <Link to="/account">View My Orders</Link>
+                </Button>
+                <Button asChild variant="outline" className="rounded-full px-8 py-6 w-full sm:w-auto">
+                  <Link to="/shop">Continue Shopping</Link>
+                </Button>
+              </div>
+            </>
+          )}
+
+          {status === 'upi_cancelled' && (
+            <>
+              <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                <XCircle className="h-11 w-11 text-red-600" aria-hidden="true" />
+              </div>
+              <h2 className="text-3xl font-playfair font-bold text-gray-900 mb-4">Order Cancelled</h2>
+              <p className="text-gray-600 mb-8">
+                This order was cancelled. No payment was due for it. Please contact us with your order number
+                {upiOrder ? <> (<span className="font-mono">{upiOrder.id.slice(0, 8)}</span>)</> : null} if you have any questions.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                <Button asChild className="rounded-full bg-primary hover:bg-primary/90 text-primary-foreground px-8 py-6 w-full sm:w-auto">
+                  <Link to="/account">View My Orders</Link>
+                </Button>
+                <Button asChild variant="outline" className="rounded-full px-8 py-6 w-full sm:w-auto">
+                  <Link to="/shop">Continue Shopping</Link>
+                </Button>
+              </div>
             </>
           )}
 

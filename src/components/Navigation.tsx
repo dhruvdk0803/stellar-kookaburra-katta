@@ -54,8 +54,9 @@ const Navigation = () => {
         const mainCats = stocked.filter(c => !c.parent_id);
         const grouped: { [key: string]: { root: any; children: any[] } } = {};
         
+        // Keyed by id: two brand-promoted categories can carry the same label.
         mainCats.forEach(mc => {
-          grouped[mc.name] = {
+          grouped[mc.id] = {
             root: mc,
             children: stocked.filter((category) => {
               let current = category;
@@ -93,7 +94,7 @@ const Navigation = () => {
               }
               return false;
             });
-            grouped[root.name] = { root, children: descendants };
+            grouped[root.id] = { root, children: descendants };
           });
           setShopCategories(grouped);
         }
@@ -215,16 +216,16 @@ const Navigation = () => {
                     <div className="p-4 text-sm text-gray-500 text-center">No categories found</div>
                   ) : (
                     <div className="grid grid-cols-2 gap-2 lg:grid-cols-3">
-                    {Object.entries(shopCategories).map(([categoryName, group]) => (
-                      <div key={categoryName} className="rounded-xl p-3 hover:bg-gray-50">
+                    {Object.entries(shopCategories).map(([categoryId, group]) => (
+                      <div key={categoryId} className="rounded-xl p-3 hover:bg-gray-50">
                         <div 
                           className="font-semibold text-gray-900 px-2 py-2 text-sm border-b border-gray-100 mb-2 cursor-pointer hover:text-primary"
                           onClick={() => {
-                            navigate(`/shop?category=${encodeURIComponent(group.root.slug || categoryName)}`);
+                            navigate(`/shop?category=${encodeURIComponent(group.root.slug || group.root.name)}`);
                             setIsShopMenuOpen(false);
                           }}
                         >
-                          {categoryName}
+                          {group.root.name}
                         </div>
                         {group.children.map((sub) => (
                           <DropdownMenuItem 
@@ -424,16 +425,16 @@ const Navigation = () => {
                           ) : Object.keys(shopCategories).length === 0 ? (
                             <div className="p-4 text-sm text-gray-500">No categories found</div>
                           ) : (
-                            Object.entries(shopCategories).map(([categoryName, group]) => (
-                              <div key={categoryName}>
+                            Object.entries(shopCategories).map(([categoryId, group]) => (
+                              <div key={categoryId}>
                                 <div 
                                   className="font-semibold text-gray-900 px-3 py-2 text-base border-b border-gray-200 mb-1 cursor-pointer"
                                   onClick={() => {
-                                    navigate(`/shop?category=${encodeURIComponent(group.root.slug || categoryName)}`);
+                                    navigate(`/shop?category=${encodeURIComponent(group.root.slug || group.root.name)}`);
                                     setIsMobileMenuOpen(false);
                                   }}
                                 >
-                                  {categoryName}
+                                  {group.root.name}
                                 </div>
                                 <div className="flex flex-col space-y-1">
                                   {group.children.map((sub) => (

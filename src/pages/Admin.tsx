@@ -11,11 +11,29 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Loader2, LogOut, Package, Tags, ShoppingBag, Edit2, Trash2, X, DollarSign, Activity, LayoutDashboard, ChevronDown, ChevronUp, Upload, Image as ImageIcon, FileSpreadsheet, Wrench } from 'lucide-react';
+import { Loader2, LogOut, Package, Tags, ShoppingBag, Edit2, Trash2, X, DollarSign, Activity, LayoutDashboard, ChevronDown, ChevronUp, Upload, Image as ImageIcon, Wrench, Percent } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
 import { ensureBrandPrefix, stripKnownBrandPrefix } from '@/lib/catalog';
 import { getSavedVariantImage } from '@/lib/productImages';
 import { SpecRow, mergeSpecsForSave, splitSpecsForEditing, validateSpecRows } from '@/lib/specs';
+import BulkProductUpload from '@/components/admin/BulkProductUpload';
+import ProductPolicyFields from '@/components/admin/ProductPolicyFields';
+import DiscountTiersManager from '@/components/admin/DiscountTiersManager';
+import BrandLogo from '@/components/BrandLogo';
+import OpenInMapsLink from '@/components/OpenInMapsLink';
+import { buildPolicyPayload } from '@/lib/policies';
+import { isValidCoordinate, toCoordinate } from '@/lib/location';
+import { getProductCounts, formatProductCounts } from '@/lib/productCounts';
+import { getPaymentMethodLabel } from '@/lib/paymentMethods';
+import {
+  type AdminOrderFields,
+  cleanContactPhone,
+  countsAsRevenue,
+  formatOrderAmount,
+  formatOrderDiscount,
+  getOrderStatusOptions,
+  getPaymentStatusInfo,
+} from '@/lib/adminOrders';
 
 type ProductVariant = {
   _editorKey?: string;
@@ -42,53 +60,6 @@ const getErrorMessage = (error: unknown) => {
 
 // Slugs end up in /shop?category=... links: trim, lowercase and never contain spaces.
 const normalizeSlug = (value: string) => value.trim().toLowerCase().replace(/\s+/g, '-');
-
-// RFC 4180-style parser: quoted fields may contain commas, doubled quotes and line breaks.
-const parseCsv = (text: string): string[][] => {
-  const source = text.replace(/^﻿/, '');
-  const rows: string[][] = [];
-  let row: string[] = [];
-  let field = '';
-  let inQuotes = false;
-  for (let i = 0; i < source.length; i++) {
-    const char = source[i];
-    if (inQuotes) {
-      if (char === '"') {
-        if (source[i + 1] === '"') { field += '"'; i++; } else inQuotes = false;
-      } else field += char;
-    } else if (char === '"' && field === '') {
-      inQuotes = true;
-    } else if (char === ',') {
-      row.push(field); field = '';
-    } else if (char === '\n' || char === '\r') {
-      if (char === '\r' && source[i + 1] === '\n') i++;
-      row.push(field); rows.push(row); row = []; field = '';
-    } else field += char;
-  }
-  if (inQuotes) throw new Error('CSV has a quoted field that is never closed.');
-  row.push(field);
-  if (row.some((value) => value.trim() !== '')) rows.push(row);
-  return rows;
-};
-
-const parseCsvNumber = (value: string) => {
-  const cleaned = value.replace(/[₹,\s]/g, '');
-  return cleaned === '' ? Number.NaN : Number(cleaned);
-};
-
-// Mirrors the DB trigger on orders: paid -> pending, reopening cancelled, cancelling
-// razorpay orders and fulfilling uncaptured razorpay orders are all rejected, so
-// they are not offered. The current status is always listed so the select never renders blank.
-const getOrderStatusOptions = (order: { status: string; payment_id?: string | null; payment_provider?: string | null; payment_status?: string | null }) => {
-  if (order.status === 'cancelled') return ['cancelled'];
-  const isRazorpay = order.payment_provider === 'razorpay';
-  const options: string[] = [];
-  if (!order.payment_id && order.payment_status !== 'captured') options.push('pending');
-  if (!isRazorpay || order.payment_status === 'captured') options.push('confirmed', 'processing', 'shipped', 'delivered');
-  if (!isRazorpay) options.push('cancelled');
-  if (!options.includes(order.status)) options.unshift(order.status);
-  return options;
-};
 
 interface ProductCategoryOption {
   id: string;
@@ -135,25 +106,38 @@ const getCategoriesForBrand = (categories: ProductCategoryOption[], products: Pr
   return categories.filter((category) => usedIds.has(category.id));
 };
 
-// Supabase limits one response to 1,000 rows. Admin must page through the
-// whole catalog, otherwise its product list and dashboard counts diverge from
-// the public Shop page once the catalog grows beyond that limit.
+// Supabase limits one response to 1,000 rows (the API "max rows" setting). Admin
+// must page through the whole catalog, otherwise its product list and dashboard
+// counts diverge from the public Shop page once the catalog grows beyond that
+// limit. Drafts are included: the products SELECT policy lets admins read every row.
+// Paging advances by the rows actually returned and stops on an empty page (or once
+// the exact count from the first request is reached), so a lower server-side row cap
+// can never silently truncate the list. Rows are de-duplicated by id in case a
+// product is created while the pages are being read.
 async function fetchAllAdminProducts(): Promise<any[]> {
   const PAGE_SIZE = 1000;
   const allProducts: any[] = [];
+  const seenIds = new Set<string>();
+  let expectedTotal: number | null = null;
 
-  for (let from = 0; ; from += PAGE_SIZE) {
-    const { data, error } = await supabase
+  for (let from = 0; ;) {
+    const { data, error, count } = await supabase
       .from('products')
-      .select('*, categories(name), brands(name, slug)')
+      .select('*, categories(name), brands(name, slug)', from === 0 ? { count: 'exact' } : undefined)
       .order('created_at', { ascending: false })
       .order('id', { ascending: false })
       .range(from, from + PAGE_SIZE - 1);
 
     if (error) throw error;
+    if (from === 0 && typeof count === 'number') expectedTotal = count;
     if (!data || data.length === 0) break;
-    allProducts.push(...data);
-    if (data.length < PAGE_SIZE) break;
+    for (const row of data) {
+      if (seenIds.has(row.id)) continue;
+      seenIds.add(row.id);
+      allProducts.push(row);
+    }
+    from += data.length;
+    if (expectedTotal !== null && from >= expectedTotal) break;
   }
 
   return allProducts;
@@ -186,9 +170,134 @@ async function fetchAllAdminOrders() {
   return allOrders.map((order) => ({ ...order, profiles: { name: names.get(order.user_id) ?? null } }));
 }
 
-const countsAsRevenue = (order: { status: string; payment_provider?: string | null; payment_status?: string | null }) =>
-  ['confirmed', 'processing', 'shipped', 'delivered'].includes(order.status) &&
-  (order.payment_provider !== 'razorpay' || order.payment_status === 'captured');
+// The columns Admin reads from an order row. Everything added by the checkout upgrade is optional:
+// legacy orders have NULL (or no such column at all before the migration is run).
+interface AdminOrderItemRecord {
+  id: string;
+  quantity?: number | null;
+  price?: number | string | null;
+  variant_label?: string | null;
+  product_name_snapshot?: string | null;
+  product_image_snapshot?: string | null;
+  products?: { name?: string | null; image_url?: string | null; images?: string[] | null } | null;
+}
+
+interface AdminOrderRecord extends AdminOrderFields {
+  id: string;
+  address?: string | null;
+  total_amount?: number | string | null;
+  subtotal_amount?: number | string | null;
+  shipping_amount?: number | string | null;
+  discount_percent?: number | string | null;
+  discount_amount?: number | string | null;
+  contact_phone?: string | null;
+  delivery_latitude?: number | string | null;
+  delivery_longitude?: number | string | null;
+  delivery_location_label?: string | null;
+  order_items?: AdminOrderItemRecord[] | null;
+}
+
+const PAYMENT_TONE_CLASSES = {
+  good: 'bg-emerald-100 text-emerald-700',
+  warn: 'bg-amber-100 text-amber-800',
+  bad: 'bg-red-100 text-red-700',
+  neutral: 'bg-gray-100 text-gray-700',
+} as const;
+
+const OrderDetailRow = ({ label, children }: { label: string; children: React.ReactNode }) => (
+  <div className="min-w-0">
+    <dt className="text-xs font-medium uppercase tracking-wide text-gray-500">{label}</dt>
+    <dd className="mt-1 break-words text-sm text-gray-900">{children}</dd>
+  </div>
+);
+
+const OrderAmountLine = ({ label, value, strong }: { label: string; value: string; strong?: boolean }) => (
+  <div className={`flex items-baseline justify-between gap-4 ${strong ? 'border-t border-gray-100 pt-2 font-bold text-gray-900' : 'text-gray-600'}`}>
+    <span>{label}</span>
+    <span className={strong ? 'text-primary' : 'font-medium text-gray-900'}>{value}</span>
+  </div>
+);
+
+// Everything about one order beyond its table row. Orders placed before the checkout
+// upgrade have NULL for most of these columns (or the columns are absent entirely
+// before the migration is run), so every part is optional and renders only when present.
+const OrderDetails = ({ order }: { order: AdminOrderRecord }) => {
+  const payment = getPaymentStatusInfo(order);
+  const discountText = formatOrderDiscount(order);
+  const subtotal = formatOrderAmount(order.subtotal_amount);
+  const shipping = formatOrderAmount(order.shipping_amount);
+  const total = formatOrderAmount(order.total_amount);
+  const phone = cleanContactPhone(order.contact_phone);
+  const locationLabel = typeof order.delivery_location_label === 'string' ? order.delivery_location_label.trim() : '';
+  const hasPin = isValidCoordinate(toCoordinate(order.delivery_latitude), toCoordinate(order.delivery_longitude));
+  const items: AdminOrderItemRecord[] = Array.isArray(order.order_items) ? order.order_items : [];
+
+  return (
+    // sticky + a viewport-based width keeps this panel inside the visible part of the
+    // table's own horizontal scroller on phones, instead of stretching to the table width.
+    <div className="sticky left-0 w-[calc(100vw-5rem)] max-w-full space-y-5">
+      <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <OrderDetailRow label="Payment">
+          <span className="font-medium">{getPaymentMethodLabel(order)}</span>
+          <span className={`ml-2 inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${PAYMENT_TONE_CLASSES[payment.tone]}`}>{payment.label}</span>
+        </OrderDetailRow>
+        {phone && (
+          <OrderDetailRow label="Contact phone">
+            <a href={`tel:${phone.replace(/[^\d+]/g, '')}`} className="font-medium text-primary hover:underline">{phone}</a>
+          </OrderDetailRow>
+        )}
+        <OrderDetailRow label="Delivery address">{order.address || 'Not recorded'}</OrderDetailRow>
+        {(hasPin || locationLabel) && (
+          <OrderDetailRow label="Delivery Location">
+            {hasPin ? (
+              <OpenInMapsLink latitude={order.delivery_latitude} longitude={order.delivery_longitude} label={locationLabel || null} />
+            ) : (
+              <span>{locationLabel}</span>
+            )}
+          </OrderDetailRow>
+        )}
+      </dl>
+
+      {(subtotal || discountText || shipping) && (
+        <div className="max-w-sm space-y-2 rounded-lg border border-gray-100 bg-white p-3 text-sm">
+          {subtotal && <OrderAmountLine label="Items subtotal" value={subtotal} />}
+          {discountText && (
+            <p className="rounded-md bg-emerald-50 px-2.5 py-1.5 text-xs font-semibold text-emerald-700">{discountText}</p>
+          )}
+          {shipping && <OrderAmountLine label="Shipping" value={shipping} />}
+          {total && <OrderAmountLine label="Total" value={total} strong />}
+        </div>
+      )}
+
+      <div>
+        <h4 className="mb-3 font-semibold text-gray-900">Order Items</h4>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          {items.map((item) => {
+            const img = item.product_image_snapshot || ((item.products?.images && item.products.images.length > 0) ? item.products.images[0] : (item.products?.image_url || '/placeholder.svg'));
+            const itemName = item.product_name_snapshot || item.products?.name || 'Unknown Product';
+            return (
+              <div key={item.id} className="flex items-center space-x-4 rounded-lg border border-gray-100 bg-white p-3 shadow-sm">
+                <img src={img} alt={itemName} className="h-16 w-16 shrink-0 rounded-md border border-gray-100 object-cover" />
+                <div className="min-w-0 flex-1">
+                  <p className="line-clamp-2 font-medium text-gray-900">
+                    {itemName}
+                    {item.variant_label ? ` (${item.variant_label})` : ''}
+                  </p>
+                  <div className="mt-1 flex justify-between text-sm text-gray-500">
+                    <span>Qty: {item.quantity}</span>
+                    <span className="font-medium text-gray-900">₹{((Number(item.price) || 0) * (Number(item.quantity) || 0)).toFixed(2)}</span>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+          {items.length === 0 && <p className="text-sm text-gray-500">No item lines were recorded for this order.</p>}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 
 const Admin = () => {
   const { user, profile, isLoading, signOut } = useAuth();
@@ -237,7 +346,9 @@ const Admin = () => {
   const [prodPreservedSpecs, setProdPreservedSpecs] = useState<Record<string, unknown>>({});
   const [isUploadingImages, setIsUploadingImages] = useState(false);
   const [isSavingProduct, setIsSavingProduct] = useState(false);
-  const [isUploadingBulk, setIsUploadingBulk] = useState(false);
+  // Per-product return / replacement wording; empty falls back to the store-wide text.
+  const [prodReturnPolicy, setProdReturnPolicy] = useState('');
+  const [prodReplacementPolicy, setProdReplacementPolicy] = useState('');
   const [isFixingDescriptions, setIsFixingDescriptions] = useState(false);
   const [listBrand, setListBrand] = useState('');
   const [listCategory, setListCategory] = useState('');
@@ -416,6 +527,7 @@ const Admin = () => {
   const resetProductForm = () => {
     setProdName(''); setProdPrice(''); setProdDesc(''); setProdCat(''); setProdBrand(''); setShowAllProductCategories(false); setProdStock('100'); setProdIsActive(true); setProdImages([]); setProdVariants([]); setProdVariantType('size');
     setProdSpecs([]); setProdPreservedSpecs({});
+    setProdReturnPolicy(''); setProdReplacementPolicy('');
     setEditingProductId(null);
   };
 
@@ -533,6 +645,12 @@ const Admin = () => {
       image_url: prodImages.length > 0 ? prodImages[0] : null,
       variants,
       specs: mergeSpecsForSave(prodSpecs, prodPreservedSpecs),
+      // Only sends the policy columns when there is text to save or text to clear, so
+      // saving keeps working in a database that does not have the columns yet.
+      ...buildPolicyPayload(
+        { returnPolicy: prodReturnPolicy, replacementPolicy: prodReplacementPolicy },
+        editingProductId ? products.find((product) => product.id === editingProductId) ?? null : null,
+      ),
     };
 
     setIsSavingProduct(true);
@@ -564,8 +682,11 @@ const Admin = () => {
     const { editable: editableSpecs, preserved: preservedSpecs } = splitSpecsForEditing(product.specs, createVariantEditorKey);
     setProdSpecs(editableSpecs);
     setProdPreservedSpecs(preservedSpecs);
+    // These columns are missing from rows read before the policy migration is applied.
+    setProdReturnPolicy(typeof product.return_policy === 'string' ? product.return_policy : '');
+    setProdReplacementPolicy(typeof product.replacement_policy === 'string' ? product.replacement_policy : '');
 
-    let imgs = Array.isArray(product.images) ? product.images : [];
+    let imgs =Array.isArray(product.images) ? product.images : [];
     if (imgs.length === 0 && product.image_url) imgs = [product.image_url];
     // Older catalog rows may keep option photos outside the gallery. Surface
     // them here so an admin can keep or remove them deliberately.
@@ -636,74 +757,6 @@ const Admin = () => {
     }
   };
 
-  // --- Bulk Upload ---
-  const handleBulkUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setIsUploadingBulk(true);
-    try {
-      const rows = parseCsv(await file.text());
-      if (rows.length === 0) throw new Error('The CSV file is empty.');
-      const headers = rows[0].map((h) => h.trim().toLowerCase().replace(/[\s-]+/g, '_'));
-      if (!headers.includes('brand') && !headers.includes('brand_slug')) throw new Error('CSV must include a brand or brand_slug column.');
-      const allowedHeaders = ['name', 'brand', 'brand_slug', 'price', 'description', 'category_id', 'stock', 'images'];
-      const unknownHeader = headers.find((header) => header && !allowedHeaders.includes(header));
-      if (unknownHeader) throw new Error(`Unknown CSV column "${unknownHeader}". Allowed columns: ${allowedHeaders.join(', ')}.`);
-      const missingHeader = ['name', 'price', 'category_id'].find((header) => !headers.includes(header));
-      if (missingHeader) throw new Error(`CSV must include a ${missingHeader} column.`);
-
-      const productsToInsert: any[] = [];
-
-      for (let i = 1; i < rows.length; i++) {
-        const values = rows[i].map((v) => v.trim());
-        if (values.every((v) => !v)) continue;
-
-        const product: any = {};
-        headers.forEach((header, index) => {
-          if (!header) return;
-          const value = values[index] ?? '';
-          if (header === 'price') {
-            product.price = parseCsvNumber(value);
-          } else if (header === 'stock') {
-            product.stock = value === '' ? 0 : parseCsvNumber(value);
-          } else if (header === 'images') {
-            const urls = value.split(';').map(url => url.trim()).filter(Boolean);
-            product['images'] = urls;
-            if (urls.length > 0) product['image_url'] = urls[0];
-          } else {
-            product[header] = value;
-          }
-        });
-
-        const requestedBrand = String(product.brand_slug || product.brand || '').toLowerCase();
-        const matchedBrand = brands.find((brand) => String(brand.slug ?? '').toLowerCase() === requestedBrand || String(brand.name ?? '').toLowerCase() === requestedBrand);
-        if (!matchedBrand) throw new Error(`Row ${i + 1}: unknown brand "${product.brand_slug || product.brand || ''}".`);
-        if (!product.name || !product.category_id) throw new Error(`Row ${i + 1}: name and category_id are required.`);
-        if (!categories.some((category) => category.id === product.category_id)) throw new Error(`Row ${i + 1}: category_id "${product.category_id}" does not exist in Admin.`);
-        if (!Number.isFinite(product.price) || product.price <= 0) throw new Error(`Row ${i + 1}: price must be a number greater than zero.`);
-        if (product.stock !== undefined && (!Number.isInteger(product.stock) || product.stock < 0)) throw new Error(`Row ${i + 1}: stock must be a whole number of zero or more.`);
-        product.brand_id = matchedBrand.id;
-        product.name = ensureBrandPrefix(stripKnownBrandPrefix(product.name, brands), matchedBrand.name);
-        delete product.brand;
-        delete product.brand_slug;
-        product.is_active = true;
-        productsToInsert.push(product);
-      }
-
-      if (productsToInsert.length === 0) throw new Error('No product rows found in the CSV.');
-      const { error } = await supabase.from('products').insert(productsToInsert);
-      if (error) throw error;
-      toast.success(`Successfully uploaded ${productsToInsert.length} products!`);
-      fetchData();
-    } catch (error: unknown) {
-      toast.error(`Bulk upload failed: ${getErrorMessage(error)}`);
-    } finally {
-      setIsUploadingBulk(false);
-      e.target.value = '';
-    }
-  };
-
   // --- Quick Fixes ---
   const handleFixDescriptions = async () => {
     setIsFixingDescriptions(true);
@@ -745,6 +798,8 @@ const Admin = () => {
 
   // --- Order Actions ---
   const handleUpdateOrderStatus = async (id: string, status: string) => {
+    // Cancelling is final (the database never lets a cancelled order be reopened) and returns reserved stock.
+    if (status === 'cancelled' && !window.confirm('Cancel this order? A cancelled order cannot be reopened, and any stock held for it is returned.')) return;
     // The status <select> is controlled, so it snaps back to the stored status when this fails.
     const { data, error } = await supabase.from('orders').update({ status }).eq('id', id).select('id');
     if (error) toast.error(`Order status was not changed: ${error.message}`);
@@ -766,35 +821,44 @@ const Admin = () => {
   };
 
   const totalRevenue = orders.filter(countsAsRevenue).reduce((sum, o) => sum + Number(o.total_amount), 0);
-  const activeProductCount = products.filter((product) => product.is_active !== false).length;
   const productCategoryOptions = prodBrand && !showAllProductCategories ? getCategoriesForBrand(categories, products, prodBrand) : categories;
+  // A brand or category filter whose option no longer exists (brand deleted, category deleted, or
+  // products moved so the chosen brand no longer uses that category) is ignored, matching the
+  // select, which then shows "All" - otherwise it would keep hiding rows with no visible reason.
+  const activeListBrand = listBrand && brands.some((brand) => brand.id === listBrand) ? listBrand : '';
   const listCategoryOptions = useMemo(() => {
-    if (!listBrand) return categories;
-    if (!products.some((product) => product.brand_id === listBrand)) return [];
-    return getCategoriesForBrand(categories, products, listBrand);
-  }, [categories, products, listBrand]);
+    if (!activeListBrand) return categories;
+    if (!products.some((product) => product.brand_id === activeListBrand)) return [];
+    return getCategoriesForBrand(categories, products, activeListBrand);
+  }, [categories, products, activeListBrand]);
+  const activeListCategory = listCategory && listCategoryOptions.some((category) => category.id === listCategory) ? listCategory : '';
   const matchingProducts = useMemo(() => {
     const search = listSearch.trim().toLocaleLowerCase();
-    const selectedCategory = categories.find((category) => category.id === listCategory);
+    const selectedCategory = categories.find((category) => category.id === activeListCategory);
+    // Selecting a parent category also matches products filed under any of its subcategories.
     const categoryMatches = (categoryId: string | null) => {
-      // A filter pointing at a since-deleted category is ignored (the select already shows "All").
       if (!selectedCategory) return true;
       let current = categories.find((category) => category.id === categoryId);
       let guard = 0;
       while (current && guard++ < 20) {
         if (current.id === selectedCategory.id) return true;
-        current = categories.find((category) => category.id === current.parent_id);
+        const parentId = current.parent_id;
+        current = parentId ? categories.find((category) => category.id === parentId) : undefined;
       }
       return false;
     };
 
     return products.filter((product) =>
-      (!listBrand || product.brand_id === listBrand) &&
-      (!listCategory || categoryMatches(product.category_id)) &&
+      (!activeListBrand || product.brand_id === activeListBrand) &&
+      (!activeListCategory || categoryMatches(product.category_id)) &&
       (listStatus === 'all' || (product.is_active !== false) === (listStatus === 'live')) &&
       (!search || String(product.name || '').toLocaleLowerCase().includes(search)),
     );
-  }, [products, categories, listBrand, listCategory, listStatus, listSearch]);
+  }, [products, categories, activeListBrand, activeListCategory, listStatus, listSearch]);
+  // One helper feeds the Product List title and the "Live Products" card, so they cannot disagree.
+  const productCounts = useMemo(() => getProductCounts(products, matchingProducts), [products, matchingProducts]);
+  const hasListFilters = Boolean(listSearch.trim() || activeListBrand || activeListCategory || listStatus !== 'all');
+  const clearListFilters = () => { setListSearch(''); setListBrand(''); setListCategory(''); setListStatus('all'); };
   const hasProductVariants = prodVariants.length > 0;
   const validVariantPrices = prodVariants
     .map((variant) => parsePrice(variant.price))
@@ -835,20 +899,24 @@ const Admin = () => {
         </div>
         
         <Tabs defaultValue="overview" className="w-full">
-          <TabsList className="grid w-full grid-cols-5 mb-8 bg-white p-1 rounded-xl shadow-sm border border-gray-100">
-            <TabsTrigger value="overview" className="rounded-lg py-3"><LayoutDashboard className="w-4 h-4 mr-2 hidden sm:block" /> Overview</TabsTrigger>
-            <TabsTrigger value="orders" className="rounded-lg py-3"><ShoppingBag className="w-4 h-4 mr-2 hidden sm:block" /> Orders</TabsTrigger>
-            <TabsTrigger value="products" className="rounded-lg py-3"><Package className="w-4 h-4 mr-2 hidden sm:block" /> Products</TabsTrigger>
-            <TabsTrigger value="categories" className="rounded-lg py-3"><Tags className="w-4 h-4 mr-2 hidden sm:block" /> Categories</TabsTrigger>
-            <TabsTrigger value="brands" className="rounded-lg py-3"><Tags className="w-4 h-4 mr-2 hidden sm:block" /> Brands</TabsTrigger>
-          </TabsList>
+          {/* Six tabs do not fit a 360px phone: the list scrolls sideways inside its own box, never the page. */}
+          <div className="mb-8 max-w-full overflow-x-auto rounded-xl border border-gray-100 bg-white shadow-sm">
+            <TabsList className="flex h-auto w-max min-w-full justify-start rounded-xl bg-white p-1">
+              <TabsTrigger value="overview" className="flex-1 rounded-lg px-4 py-3"><LayoutDashboard className="w-4 h-4 mr-2 hidden sm:block" /> Overview</TabsTrigger>
+              <TabsTrigger value="orders" className="flex-1 rounded-lg px-4 py-3"><ShoppingBag className="w-4 h-4 mr-2 hidden sm:block" /> Orders</TabsTrigger>
+              <TabsTrigger value="products" className="flex-1 rounded-lg px-4 py-3"><Package className="w-4 h-4 mr-2 hidden sm:block" /> Products</TabsTrigger>
+              <TabsTrigger value="categories" className="flex-1 rounded-lg px-4 py-3"><Tags className="w-4 h-4 mr-2 hidden sm:block" /> Categories</TabsTrigger>
+              <TabsTrigger value="brands" className="flex-1 rounded-lg px-4 py-3"><Tags className="w-4 h-4 mr-2 hidden sm:block" /> Brands</TabsTrigger>
+              <TabsTrigger value="discounts" className="flex-1 rounded-lg px-4 py-3"><Percent className="w-4 h-4 mr-2 hidden sm:block" /> Discounts</TabsTrigger>
+            </TabsList>
+          </div>
 
           {/* OVERVIEW TAB */}
           <TabsContent value="overview" className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <Card className="border-0 shadow-sm"><CardContent className="p-6 flex items-center space-x-4"><div className="p-4 bg-green-100 rounded-full"><DollarSign className="h-8 w-8 text-green-600" /></div><div><p className="text-sm font-medium text-gray-500">Total Revenue</p><h3 className="text-2xl font-bold text-gray-900">₹{totalRevenue.toLocaleString()}</h3></div></CardContent></Card>
+              <Card className="border-0 shadow-sm"><CardContent className="p-6 flex items-center space-x-4"><div className="p-4 bg-green-100 rounded-full"><DollarSign className="h-8 w-8 text-green-600" /></div><div><p className="text-sm font-medium text-gray-500">Total Revenue</p><h3 className="text-2xl font-bold text-gray-900">₹{totalRevenue.toLocaleString()}</h3><p className="text-xs text-gray-500">Captured online payments + UPI on Delivery once delivered</p></div></CardContent></Card>
               <Card className="border-0 shadow-sm"><CardContent className="p-6 flex items-center space-x-4"><div className="p-4 bg-blue-100 rounded-full"><ShoppingBag className="h-8 w-8 text-blue-600" /></div><div><p className="text-sm font-medium text-gray-500">Total Orders</p><h3 className="text-2xl font-bold text-gray-900">{orders.length}</h3></div></CardContent></Card>
-              <Card className="border-0 shadow-sm"><CardContent className="p-6 flex items-center space-x-4"><div className="p-4 bg-purple-100 rounded-full"><Package className="h-8 w-8 text-purple-600" /></div><div><p className="text-sm font-medium text-gray-500">Live Products</p><h3 className="text-2xl font-bold text-gray-900">{activeProductCount}</h3><p className="text-xs text-gray-500">{products.length} total in Admin</p></div></CardContent></Card>
+              <Card className="border-0 shadow-sm"><CardContent className="p-6 flex items-center space-x-4"><div className="p-4 bg-purple-100 rounded-full"><Package className="h-8 w-8 text-purple-600" /></div><div><p className="text-sm font-medium text-gray-500">Live Products</p><h3 className="text-2xl font-bold text-gray-900">{productCounts.live}</h3><p className="text-xs text-gray-500">{productCounts.total} total · {productCounts.draft} draft</p></div></CardContent></Card>
             </div>
 
             {/* Charts Section */}
@@ -934,7 +1002,10 @@ const Admin = () => {
                             <td className="px-4 py-4 font-mono text-xs text-gray-600">{order.id.slice(0, 8)}</td>
                             <td className="px-4 py-4 font-medium text-gray-900">{order.profiles?.name || 'Unknown'}</td>
                             <td className="px-4 py-4 text-gray-600">{new Date(order.created_at).toLocaleDateString()}</td>
-                            <td className="px-4 py-4 font-bold text-primary">₹{Number(order.total_amount).toFixed(2)}</td>
+                            <td className="px-4 py-4">
+                              <div className="font-bold text-primary">₹{Number(order.total_amount).toFixed(2)}</div>
+                              <div className="mt-0.5 whitespace-nowrap text-xs text-gray-500">{getPaymentMethodLabel(order)}</div>
+                            </td>
                             <td className="px-4 py-4">
                               <select 
                                 className="text-sm border border-gray-200 rounded-md px-2 py-1.5 bg-white focus:ring-2 focus:ring-primary/20 outline-none"
@@ -950,36 +1021,8 @@ const Admin = () => {
                           </tr>
                           {expandedOrderId === order.id && (
                             <tr className="bg-gray-50/80 border-b border-gray-100">
-                              <td colSpan={6} className="px-8 py-6">
-                                <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-                                  <h4 className="font-semibold text-gray-900">Order Items</h4>
-                                  {Number(order.discount_percent) > 0 && (
-                                    <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">
-                                      {Number(order.discount_percent)}% discount · saved ₹{Number(order.discount_amount || 0).toFixed(2)}
-                                    </span>
-                                  )}
-                                </div>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                  {order.order_items?.map((item: any) => {
-                                    const img = item.product_image_snapshot || ((item.products?.images && item.products.images.length > 0) ? item.products.images[0] : (item.products?.image_url || '/placeholder.svg'));
-                                    const itemName = item.product_name_snapshot || item.products?.name || 'Unknown Product';
-                                    return (
-                                      <div key={item.id} className="flex items-center space-x-4 bg-white p-3 rounded-lg border border-gray-100 shadow-sm">
-                                        <img src={img} alt={itemName} className="w-16 h-16 rounded-md object-cover border border-gray-100" />
-                                        <div className="flex-1">
-                                          <p className="font-medium text-gray-900 line-clamp-1">
-                                            {itemName}
-                                            {item.variant_label ? ` (${item.variant_label})` : ''}
-                                          </p>
-                                          <div className="flex justify-between mt-1 text-sm text-gray-500">
-                                            <span>Qty: {item.quantity}</span>
-                                            <span className="font-medium text-gray-900">₹{((Number(item.price) || 0) * (Number(item.quantity) || 0)).toFixed(2)}</span>
-                                          </div>
-                                        </div>
-                                      </div>
-                                    );
-                                  })}
-                                </div>
+                              <td colSpan={6} className="px-4 py-5 sm:px-8 sm:py-6">
+                                <OrderDetails order={order} />
                               </td>
                             </tr>
                           )}
@@ -1134,7 +1177,7 @@ const Admin = () => {
                       <div className="flex items-center justify-between rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5">
                         <div>
                           <p className="text-sm font-medium text-gray-800">Show on website</p>
-                          <p className="text-xs text-gray-500">Draft products are visible only in Admin.</p>
+                          <p className="text-xs text-gray-500">{prodIsActive ? 'Live: customers can see and buy this product.' : 'Draft: hidden from customers and visible only in Admin.'}</p>
                         </div>
                         <Switch checked={prodIsActive} onCheckedChange={setProdIsActive} aria-label="Show product on website" />
                       </div>
@@ -1191,6 +1234,14 @@ const Admin = () => {
                         ))}
                       </div>
 
+                      {/* Return / replacement policy (product page falls back to store-wide wording when empty) */}
+                      <ProductPolicyFields
+                        returnPolicy={prodReturnPolicy}
+                        replacementPolicy={prodReplacementPolicy}
+                        onReturnPolicyChange={setProdReturnPolicy}
+                        onReplacementPolicyChange={setProdReplacementPolicy}
+                      />
+
                       {/* Image Upload Section */}
                       <div className="space-y-3 border border-gray-200 rounded-xl p-4 bg-gray-50/50">
                         <div className="flex items-center justify-between">
@@ -1237,23 +1288,8 @@ const Admin = () => {
                   </CardContent>
                 </Card>
 
-                {/* Bulk Upload Card */}
-                <Card className="border-0 shadow-sm">
-                  <CardHeader><CardTitle className="flex items-center"><FileSpreadsheet className="w-5 h-5 mr-2" /> Bulk Upload (CSV)</CardTitle></CardHeader>
-                  <CardContent>
-                    <p className="text-xs text-gray-500 mb-4">
-                      Format: <code className="bg-gray-100 px-1 rounded">name, brand_slug, price, description, category_id, stock, images</code><br/>
-                      (Separate multiple image URLs with a semicolon <code className="bg-gray-100 px-1 rounded">;</code>)
-                    </p>
-                    <label className="flex items-center justify-center w-full h-24 border-2 border-dashed border-gray-300 rounded-xl hover:bg-gray-50 cursor-pointer transition-colors">
-                      <div className="flex flex-col items-center">
-                        {isUploadingBulk ? <Loader2 className="w-6 h-6 text-primary animate-spin mb-2" /> : <Upload className="w-6 h-6 text-gray-400 mb-2" />}
-                        <span className="text-sm font-medium text-gray-600">{isUploadingBulk ? 'Processing...' : 'Select CSV File'}</span>
-                      </div>
-                      <input type="file" accept=".csv" className="hidden" onChange={handleBulkUpload} disabled={isUploadingBulk} />
-                    </label>
-                  </CardContent>
-                </Card>
+                {/* Bulk Product Upload (preview, validation report, batched import) */}
+                <BulkProductUpload brands={brands} categories={categories} onImported={fetchData} />
 
                 {/* Quick Fixes Card */}
                 <Card className="border-0 shadow-sm">
@@ -1276,7 +1312,7 @@ const Admin = () => {
               </div>
 
               <Card className="lg:col-span-2 border-0 shadow-sm">
-                <CardHeader><CardTitle>Product List ({matchingProducts.length} shown · {products.length} total · {activeProductCount} live)</CardTitle></CardHeader>
+                <CardHeader><CardTitle>Product List ({formatProductCounts(productCounts)})</CardTitle></CardHeader>
                 <CardContent>
                   <div className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                     <div>
@@ -1285,14 +1321,14 @@ const Admin = () => {
                     </div>
                     <div>
                       <label htmlFor="product-list-brand" className="mb-1 block text-xs font-medium text-gray-600">Brand</label>
-                      <select id="product-list-brand" className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={listBrand} onChange={(event) => { setListBrand(event.target.value); setListCategory(''); }}>
+                      <select id="product-list-brand" className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={activeListBrand} onChange={(event) => { setListBrand(event.target.value); setListCategory(''); }}>
                         <option value="">All brands</option>
                         {brands.map((brand) => <option key={brand.id} value={brand.id}>{brand.name}</option>)}
                       </select>
                     </div>
                     <div>
                       <label htmlFor="product-list-category" className="mb-1 block text-xs font-medium text-gray-600">Category</label>
-                      <select id="product-list-category" className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={listCategory} onChange={(event) => setListCategory(event.target.value)}>
+                      <select id="product-list-category" className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={activeListCategory} onChange={(event) => setListCategory(event.target.value)}>
                         <option value="">All categories</option>
                         {listCategoryOptions.map((category) => <option key={category.id} value={category.id}>{category.parent?.name ? `${category.parent.name} / ` : ''}{category.name}</option>)}
                       </select>
@@ -1306,8 +1342,8 @@ const Admin = () => {
                       </select>
                     </div>
                   </div>
-                  {(listSearch || listBrand || listCategory || listStatus !== 'all') && (
-                    <Button type="button" variant="ghost" size="sm" className="mb-3" onClick={() => { setListSearch(''); setListBrand(''); setListCategory(''); setListStatus('all'); }}>Clear filters</Button>
+                  {hasListFilters && (
+                    <Button type="button" variant="ghost" size="sm" className="mb-3" onClick={clearListFilters}>Clear filters</Button>
                   )}
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm text-left">
@@ -1454,7 +1490,14 @@ const Admin = () => {
                         {isUploadingBrandLogo ? 'Uploading…' : 'Choose logo from this device'}
                         <input type="file" accept="image/*" className="hidden" onChange={handleBrandLogoUpload} disabled={isUploadingBrandLogo} />
                       </label>
-                      {brandLogo && <img src={brandLogo} alt="Brand logo preview" className="h-20 w-28 rounded-md border border-gray-200 bg-white object-contain p-1" />}
+                      {brandLogo.trim() && (
+                        <div className="space-y-1">
+                          <div className="flex h-20 w-28 items-center justify-center overflow-hidden rounded-md border border-gray-200 bg-white p-1">
+                            <BrandLogo name={brandName.trim() || 'Brand'} logoUrl={brandLogo} fallback="initials" className="h-full w-full text-xs" />
+                          </div>
+                          <p className="text-xs text-gray-500">If the brand name appears instead of the logo, the image could not be loaded.</p>
+                        </div>
+                      )}
                     </div>
                     <Input type="number" placeholder="Display order" value={brandOrder} onChange={(e) => setBrandOrder(e.target.value)} />
                     <Button type="submit" className="w-full rounded-full" disabled={isUploadingBrandLogo}>{editingBrandId ? 'Update Brand' : 'Add Brand'}</Button>
@@ -1465,17 +1508,17 @@ const Admin = () => {
                 <CardHeader><CardTitle>Brand List ({brands.length})</CardTitle></CardHeader>
                 <CardContent className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   {brands.map(brand => (
-                    <div key={brand.id} className="flex items-center gap-4 rounded-xl border border-gray-100 p-3">
-                      <div className="flex h-14 w-24 items-center justify-center rounded-lg bg-gray-50 p-2">
-                        {brand.logo_url ? <img src={brand.logo_url} alt="" className="h-full w-full object-contain" /> : <span className="font-bold">{brand.name}</span>}
+                    <div key={brand.id} className="flex items-center gap-3 rounded-xl border border-gray-100 p-3 sm:gap-4">
+                      <div className="flex h-14 w-20 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-gray-50 p-2 sm:w-24">
+                        <BrandLogo name={brand.name} logoUrl={brand.logo_url} fallback="initials" className="h-full w-full text-xs" />
                       </div>
-                      <div className="min-w-0 flex-1"><p className="font-semibold">{brand.name}</p><p className="text-xs text-gray-500">/{brand.slug} · order {brand.display_order || 0}</p></div>
-                      <Button variant="outline" size="icon" aria-label={`Edit ${brand.name}`} onClick={() => handleEditBrand(brand)}><Edit2 className="h-4 w-4" /></Button>
+                      <div className="min-w-0 flex-1"><p className="break-words font-semibold">{brand.name}</p><p className="break-all text-xs text-gray-500">/{brand.slug} · order {brand.display_order || 0}</p></div>
+                      <Button variant="outline" size="icon" className="shrink-0" aria-label={`Edit ${brand.name}`} onClick={() => handleEditBrand(brand)}><Edit2 className="h-4 w-4" /></Button>
                       <Button
                         variant="outline"
                         size="icon"
                         aria-label={`Delete ${brand.name}`}
-                        className="border-red-100 text-red-600 hover:bg-red-50"
+                        className="shrink-0 border-red-100 text-red-600 hover:bg-red-50"
                         disabled={deletingBrandId === brand.id}
                         onClick={() => handleDeleteBrand(brand)}
                       >
@@ -1486,6 +1529,11 @@ const Admin = () => {
                 </CardContent>
               </Card>
             </div>
+          </TabsContent>
+
+          {/* DISCOUNTS TAB */}
+          <TabsContent value="discounts">
+            <DiscountTiersManager />
           </TabsContent>
         </Tabs>
       </div>

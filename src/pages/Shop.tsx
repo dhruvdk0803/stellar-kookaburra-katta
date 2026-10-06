@@ -10,7 +10,13 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/co
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Filter, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { filterNonEmptyCategories, productBrowsingCategories } from '@/lib/categories';
+import {
+  categorySelectionFromParams,
+  filterNonEmptyCategories,
+  normalizeFilterValue,
+  productBrowsingCategories,
+  productMatchesSelectedCategories,
+} from '@/lib/categories';
 
 // Fetch all active products with pagination. PostgREST caps any single
 // request at 1000 rows regardless of the requested limit, so the catalog
@@ -36,44 +42,6 @@ async function fetchAllProducts(): Promise<any[]> {
   return all;
 }
 
-const normalizeFilterValue = (value: unknown) => String(value || '').toLowerCase().trim();
-
-// Category slugs retired when Ebco's hinges were merged into Furniture Fitting > Hinges.
-// Old bookmarks and shared links keep landing on the right products.
-const LEGACY_CATEGORY_SLUGS = new Map([['ebco-hinges', 'hinges']]);
-const categoriesFromParams = (params: URLSearchParams) =>
-  params.getAll('category').map((slug) => LEGACY_CATEGORY_SLUGS.get(slug) ?? slug);
-
-interface ProductCategoryFacet {
-  id: string;
-  name: string;
-  slug?: string | null;
-  parent_id?: string | null;
-}
-
-interface ProductFacetRow {
-  category_id?: string | null;
-  categories?: ProductCategoryFacet | null;
-}
-
-const getProductCategoryTokens = (product: ProductFacetRow, categoriesById: Map<string, ProductCategoryFacet>) => {
-  const tokens = new Set<string>();
-  let category = categoriesById.get(product.category_id) || product.categories;
-  let guard = 0;
-  while (category && guard++ < 20) {
-    if (category.name) tokens.add(normalizeFilterValue(category.name));
-    if (category.slug) tokens.add(normalizeFilterValue(category.slug));
-    category = category.parent_id ? categoriesById.get(category.parent_id) : null;
-  }
-  return tokens;
-};
-
-const productMatchesSelectedCategories = (product: ProductFacetRow, selectedCategories: string[], categoriesById: Map<string, ProductCategoryFacet>) => {
-  if (!selectedCategories.length) return true;
-  const productTokens = getProductCategoryTokens(product, categoriesById);
-  return selectedCategories.some((category) => productTokens.has(normalizeFilterValue(category)));
-};
-
 const Shop = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const location = useLocation();
@@ -89,7 +57,8 @@ const Shop = () => {
   // clean step, so premium items (e.g. digital locks) are never filtered out.
   const [priceMax, setPriceMax] = useState(10000);
   const [filters, setFilters] = useState(() => {
-    const categoriesFromUrl = categoriesFromParams(searchParams);
+    // Retired category slugs/labels in old links resolve to the current slug (lib/categories.ts).
+    const categoriesFromUrl = categorySelectionFromParams(searchParams);
     const brandsFromUrl = searchParams.getAll('brand');
     return {
       category: categoriesFromUrl.length > 0 ? categoriesFromUrl : [],
@@ -201,7 +170,7 @@ const Shop = () => {
 
   // Sync URL params to state on initial load or URL change
   useEffect(() => {
-    const categoriesFromUrl = categoriesFromParams(searchParams);
+    const categoriesFromUrl = categorySelectionFromParams(searchParams);
     const brandsFromUrl = searchParams.getAll('brand');
     setFilters(prevFilters => {
       if (JSON.stringify(prevFilters.category) === JSON.stringify(categoriesFromUrl) && JSON.stringify(prevFilters.brand) === JSON.stringify(brandsFromUrl)) return prevFilters;

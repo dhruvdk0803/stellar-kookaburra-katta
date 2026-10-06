@@ -3,21 +3,24 @@ import { useCart } from '@/contexts/CartContext';
 import Navigation from '@/components/Navigation';
 import Footer from '@/components/Footer';
 import { Button } from '@/components/ui/button';
-import { Trash2, ArrowRight, ShoppingCart, AlertCircle } from 'lucide-react';
+import { Trash2, ArrowRight, ShoppingCart } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { calculateCartDiscount, MIN_ORDER_VALUE } from '@/lib/constants';
 import { formatRupees } from '@/lib/money';
+import { calculateOrderTotals, SHIPPING_FEE } from '@/lib/discounts';
+import { getCartSubtotal } from '@/lib/checkout';
+import { useDiscountTiers } from '@/hooks/useDiscountTiers';
+import DiscountProgress from '@/components/checkout/DiscountProgress';
+import OrderTotals from '@/components/checkout/OrderTotals';
 
 const Cart = () => {
-  const { cart, updateQuantity, removeFromCart, clearCart, discountPercent } = useCart();
+  const { cart, updateQuantity, removeFromCart, clearCart } = useCart();
+  const { tiers } = useDiscountTiers();
 
-  // Sum in whole paise (as the server does) so float drift such as 1999.9999999999998
-  // cannot fail the minimum-order check for a cart the server would accept.
-  const subtotal = cart.reduce((sum, item) => sum + Math.round(item.price * 100) * item.quantity, 0) / 100;
-  const discountAmount = calculateCartDiscount(subtotal, discountPercent);
-  const total = subtotal - discountAmount; // GST is included in product prices
-  const meetsMinimum = subtotal >= MIN_ORDER_VALUE;
-  const amountToMinimum = MIN_ORDER_VALUE - subtotal;
+  // Derived on every render from the cart, so the discount and banner follow
+  // each add / remove / quantity change. Same maths as the server (whole paise);
+  // GST is included in product prices and shipping is a flat fee.
+  const subtotal = getCartSubtotal(cart);
+  const totals = calculateOrderTotals(subtotal, tiers);
 
   if (cart.length === 0) {
     return (
@@ -50,6 +53,7 @@ const Cart = () => {
           <h1 className="text-3xl font-playfair font-bold text-gray-900 mb-8">Shopping Cart</h1>
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <div className="lg:col-span-2 space-y-4">
+              <DiscountProgress subtotal={subtotal} tiers={tiers} />
               {cart.map((item) => (
                 <div key={item.id} className="flex flex-col sm:flex-row items-start sm:items-center gap-4 p-4 bg-white border border-gray-100 rounded-2xl shadow-sm relative">
                   <img src={item.image} alt={item.name} className="w-full sm:w-24 h-40 sm:h-24 object-cover rounded-xl flex-shrink-0" />
@@ -64,7 +68,7 @@ const Cart = () => {
                       <Button 
                         variant="ghost" 
                         size="icon" 
-                        className="h-8 w-8 rounded-md"
+                        className="h-10 w-10 sm:h-8 sm:w-8 rounded-md"
                         aria-label={`Decrease quantity of ${item.name}`}
                         onClick={() => updateQuantity(item.id, Math.max(1, item.quantity - 1))}
                       >
@@ -74,7 +78,7 @@ const Cart = () => {
                       <Button 
                         variant="ghost" 
                         size="icon" 
-                        className="h-8 w-8 rounded-md"
+                        className="h-10 w-10 sm:h-8 sm:w-8 rounded-md"
                         aria-label={`Increase quantity of ${item.name}`}
                         onClick={() => updateQuantity(item.id, item.quantity + 1)}
                       >
@@ -105,54 +109,22 @@ const Cart = () => {
             <div className="space-y-6">
               <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 sticky top-24">
                 <h2 className="text-xl font-semibold text-gray-900 mb-6">Order Summary</h2>
-                <div className="space-y-4 text-sm text-gray-600">
-                  <div className="flex justify-between">
-                    <span>Subtotal (Incl. taxes)</span>
-                    <span className="font-medium text-gray-900">₹{formatRupees(subtotal, true)}</span>
-                  </div>
-                  <div className="flex justify-between font-medium text-emerald-700">
-                    <span>Surprise discount ({discountPercent}%)</span>
-                    <span>−₹{formatRupees(discountAmount, true)}</span>
-                  </div>
-                  <div className="flex justify-between border-t border-gray-100 pt-4 mt-4">
-                    <span className="text-base font-bold text-gray-900">Total</span>
-                    <span className="text-xl font-bold text-primary">₹{formatRupees(total, true)}</span>
-                  </div>
-                </div>
-                {!meetsMinimum && (
-                  <div className="mt-6 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4">
-                    <AlertCircle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
-                    <div className="text-sm text-amber-800">
-                      <p className="font-semibold">Minimum order value is ₹{MIN_ORDER_VALUE.toLocaleString('en-IN')}</p>
-                      <p className="mt-1">Add ₹{formatRupees(amountToMinimum, true)} more to your cart to proceed to checkout.</p>
-                    </div>
-                  </div>
-                )}
+                <OrderTotals totals={totals} />
 
-                {meetsMinimum ? (
-                  <Link to="/checkout" className="block mt-8">
-                    <Button className="w-full rounded-full bg-primary hover:bg-primary/90 text-primary-foreground py-6 text-lg flex items-center justify-center gap-2 shadow-md">
+                <div className="mt-8 space-y-3">
+                  <Button asChild className="w-full rounded-full bg-primary hover:bg-primary/90 text-primary-foreground py-6 text-lg flex items-center justify-center gap-2 shadow-md">
+                    <Link to="/checkout">
                       Proceed to Checkout
-                      <ArrowRight className="h-5 w-5" />
-                    </Button>
-                  </Link>
-                ) : (
-                  <div className="mt-6 space-y-3">
-                    <Button
-                      disabled
-                      className="w-full rounded-full bg-primary text-primary-foreground py-6 text-lg flex items-center justify-center gap-2 shadow-md"
-                    >
-                      Proceed to Checkout
-                      <ArrowRight className="h-5 w-5" />
-                    </Button>
-                    <Link to="/shop" className="block">
-                      <Button variant="outline" className="w-full rounded-full py-6 text-base">
-                        Continue Shopping
-                      </Button>
+                      <ArrowRight className="h-5 w-5" aria-hidden="true" />
                     </Link>
-                  </div>
-                )}
-                <p className="text-xs text-gray-500 text-center mt-4">Shipping calculated at checkout</p>
+                  </Button>
+                  <Button asChild variant="outline" className="w-full rounded-full py-6 text-base">
+                    <Link to="/shop">Continue Shopping</Link>
+                  </Button>
+                </div>
+                <p className="text-xs text-gray-500 text-center mt-4">
+                  Prices include GST. Flat ₹{formatRupees(SHIPPING_FEE)} shipping per order.
+                </p>
               </div>
             </div>
           </div>

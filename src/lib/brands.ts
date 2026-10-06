@@ -46,6 +46,19 @@ export function productBrand(
 }
 
 /**
+ * Up to two upper-case letters that stand in for a brand whose logo is missing
+ * or fails to load: "Ebco" -> "EB", "Birla White" -> "BW", "APL Apollo" -> "AA".
+ */
+export function brandInitials(name: string | null | undefined): string {
+  const words = String(name ?? '').trim().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return '?';
+  const letters = words.length === 1
+    ? Array.from(words[0]).slice(0, 2)
+    : words.slice(0, 2).map((word) => Array.from(word)[0]);
+  return letters.join('').toUpperCase();
+}
+
+/**
  * Distinct brands present in a set of products, in first-seen order.
  */
 export function brandsIn(products: any[], categories: CategoryNode[]): string[] {
