@@ -35,6 +35,10 @@ const LEGACY_CATEGORY_ALIASES: ReadonlyMap<string, string> = new Map([
   // row is the stocked one, so name-based links resolve to its (unchanged) slug.
   ['cpvc fittings & pipes', 'apollo-cpvc-fittings-pipes'],
   ['cpvc pipes & fittings', 'apollo-cpvc-fittings-pipes'],
+  // The uPVC / SWR category was merged into the same "CPVC & UPVC Fittings" category.
+  ['apollo-upvc-pipes-fittings', 'apollo-cpvc-fittings-pipes'],
+  ['upvc & swr pipes', 'apollo-cpvc-fittings-pipes'],
+  ['upvc pipes & fittings', 'apollo-cpvc-fittings-pipes'],
 ]);
 
 /** Maps a retired category slug or label from an old link to the current slug; anything else is returned unchanged. */

@@ -180,10 +180,10 @@ const Navigation = () => {
           {/* Logo */}
           <Link to="/" aria-label="Katta Interiors home" className="group flex shrink-0 items-center transition-opacity duration-200 hover:opacity-80">
             <img
-              src="/images/katta-interiors-logo.jpg"
+              src="/images/katta-interiors-logo.png"
               alt="Katta Interiors"
-              className="h-16 w-16 object-contain mix-blend-multiply xl:h-[72px] xl:w-[72px]"
-              width="72"
+              className="h-14 w-auto object-contain sm:h-16 xl:h-[72px]"
+              width="82"
               height="72"
             />
           </Link>

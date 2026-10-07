@@ -21,10 +21,9 @@ interface ShelfProduct {
 const directCategoryConfig = [
   { slug: 'sunmica', label: 'Laminates & Sunmica' },
   { slug: 'louvers-panels', label: 'Louvers & Wall Panels' },
-  // Renamed by the client to "CPVC and UPVC Fittings"; the database rows carry the same name.
+  // CPVC and uPVC/SWR products now share one category (the database row carries the same name).
   // The slug keeps its original spelling so existing links keep working.
-  { slug: 'apollo-cpvc-fittings-pipes', label: 'CPVC and UPVC Fittings' },
-  { slug: 'apollo-upvc-pipes-fittings', label: 'uPVC & SWR Pipes' },
+  { slug: 'apollo-cpvc-fittings-pipes', label: 'CPVC & UPVC Fittings' },
   // Hinges, drawer slides, lift-ups and sliding channels all live under this one parent.
   { slug: 'furniture-fitting', label: 'Furniture Fitting' },
   { slug: 'ebco-digital-locks', label: 'Digital Locks' },

@@ -19,6 +19,8 @@ test('old CPVC labels resolve to the unchanged CPVC slug; current slugs and name
   assert.equal(resolveLegacyCategoryAlias('CPVC Pipes & Fittings'), 'apollo-cpvc-fittings-pipes');
   assert.equal(resolveLegacyCategoryAlias('CPVC Fittings & Pipes'), 'apollo-cpvc-fittings-pipes');
   assert.equal(resolveLegacyCategoryAlias('apollo-cpvc-fittings-pipes'), 'apollo-cpvc-fittings-pipes');
+  assert.equal(resolveLegacyCategoryAlias('apollo-upvc-pipes-fittings'), 'apollo-cpvc-fittings-pipes');
+  assert.equal(resolveLegacyCategoryAlias('uPVC & SWR Pipes'), 'apollo-cpvc-fittings-pipes');
   assert.equal(resolveLegacyCategoryAlias('astral-cpvc-pipes-fittings'), 'astral-cpvc-pipes-fittings');
   assert.equal(resolveLegacyCategoryAlias('CPVC and UPVC Fittings'), 'CPVC and UPVC Fittings');
   assert.equal(resolveLegacyCategoryAlias('Plywood'), 'Plywood');

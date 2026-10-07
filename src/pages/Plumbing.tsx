@@ -12,7 +12,7 @@ const BRANDS = [
   {
     slug: 'apollo',
     label: 'APL Apollo',
-    title: 'APL Apollo CPVC and UPVC Fittings',
+    title: 'APL Apollo CPVC & UPVC Fittings',
     blurb:
       'Genuine APL Apollo CPVC pipes and fittings — engineered for strong, leak-proof, long-lasting hot and cold water plumbing systems.',
   },
