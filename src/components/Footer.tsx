@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowRight, MapPin, Phone, Mail } from 'lucide-react';
+import { ArrowRight, MapPin, Phone, MessageCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 const Footer = () => {
@@ -20,8 +20,8 @@ const Footer = () => {
               <a href="tel:+918005708058" className="hover:text-primary transition-colors">+91 8005708058</a>
             </div>
             <div className="flex items-center">
-              <Mail className="h-4 w-4 mr-2 flex-shrink-0" />
-              <a href="mailto:kattainterior@gmail.com" className="hover:text-primary transition-colors">kattainterior@gmail.com</a>
+              <MessageCircle className="h-4 w-4 mr-2 flex-shrink-0" />
+              <a href="https://wa.me/918005708058?text=Inquiry%20from%20Katta%20Interiors%20website" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors">Chat on WhatsApp</a>
             </div>
           </div>
         </div>

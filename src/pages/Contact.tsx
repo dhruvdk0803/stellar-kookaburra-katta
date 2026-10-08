@@ -4,7 +4,7 @@ import Footer from '@/components/Footer';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Send, Phone, MapPin, Mail } from 'lucide-react';
+import { Send, Phone, MapPin, MessageCircle } from 'lucide-react';
 
 const Contact = () => {
   const [formData, setFormData] = useState({ name: '', email: '', phone: '', message: '' });
@@ -106,8 +106,8 @@ const Contact = () => {
                   <a href="tel:+918005708058" className="hover:text-primary">+91 8005708058</a>
                 </div>
                 <div className="flex items-center">
-                  <Mail className="h-5 w-5 text-primary mr-3" />
-                  <a href="mailto:kattainterior@gmail.com" className="break-all hover:text-primary">kattainterior@gmail.com</a>
+                  <MessageCircle className="h-5 w-5 text-primary mr-3" />
+                  <a href="https://wa.me/918005708058?text=Inquiry%20from%20Katta%20Interiors%20website" target="_blank" rel="noopener noreferrer" className="hover:text-primary">Chat on WhatsApp</a>
                 </div>
               </div>
             </div>

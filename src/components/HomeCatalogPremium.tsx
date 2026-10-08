@@ -26,6 +26,7 @@ const directCategoryConfig = [
   { slug: 'apollo-cpvc-fittings-pipes', label: 'CPVC & UPVC Fittings' },
   // Hinges, drawer slides, lift-ups and sliding channels all live under this one parent.
   { slug: 'furniture-fitting', label: 'Furniture Fitting' },
+  { slug: 'kitchen-hardware', label: 'Kitchen Hardware' },
   { slug: 'ebco-digital-locks', label: 'Digital Locks' },
   { slug: 'jivanjor-adhesives', label: 'Adhesives' },
   { slug: 'doorskin-rockstar', label: 'Decorative Doorskins' },
@@ -53,7 +54,7 @@ const HomeCatalogPremium = () => {
       const [categoryResult, brandResult, productResult] = await Promise.all([
         supabase.from('homepage_category_cards').select('*').order('display_order').order('name'),
         supabase.from('homepage_brand_cards').select('*').order('display_order').order('name'),
-        supabase.from('homepage_product_shelves').select('*').order('root_display_order').order('root_name').order('shelf_rank'),
+        supabase.from('homepage_product_shelves').select('id, name, price, image_url, images, brand_name, root_id, root_name, shelf_rank').order('root_display_order').order('root_name').order('shelf_rank'),
       ]);
 
       if (!active) return;
@@ -136,7 +137,7 @@ const HomeCatalogPremium = () => {
               <Link key={category.id} to={categoryShopUrl(category.slug)} className="group">
                 <div className="aspect-square overflow-hidden rounded-[1.4rem] bg-[#faf9f5] p-3 sm:p-5">
                   {category.thumbnail_url ? (
-                    <img src={category.thumbnail_url} alt="" loading="lazy" className="h-full w-full object-contain transition duration-700 group-hover:scale-105" />
+                    <img src={category.thumbnail_url} alt="" width={320} height={320} loading="lazy" decoding="async" className="h-full w-full object-contain transition duration-700 group-hover:scale-105" />
                   ) : (
                     <div className="flex h-full items-center justify-center"><PackageSearch className="h-8 w-8 text-[#968e80]" /></div>
                   )}
@@ -164,7 +165,7 @@ const HomeCatalogPremium = () => {
               return (
                 <Link key={product.id} to={`/product/${product.id}`} className="group block">
                   <div className="aspect-square overflow-hidden rounded-[1.5rem] bg-[#f5f4f0] p-5">
-                    <img src={image} alt={product.name} loading="lazy" className="h-full w-full object-contain transition duration-700 group-hover:scale-[1.04]" />
+                    <img src={image} alt={product.name} width={320} height={320} loading="lazy" decoding="async" className="h-full w-full object-contain transition duration-700 group-hover:scale-[1.04]" />
                   </div>
                   <div className="mt-4 flex items-start justify-between gap-3">
                     <div className="min-w-0">

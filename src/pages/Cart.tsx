@@ -123,7 +123,7 @@ const Cart = () => {
                   </Button>
                 </div>
                 <p className="text-xs text-gray-500 text-center mt-4">
-                  Prices include GST. Flat ₹{formatRupees(SHIPPING_FEE)} shipping per order.
+                  Prices include GST. Shipping is free on every order.
                 </p>
               </div>
             </div>

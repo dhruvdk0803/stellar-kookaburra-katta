@@ -269,14 +269,14 @@ const Account = () => {
                         )}
                         {discount !== null && discount > 0 && (
                           <div className="flex justify-between gap-4 text-sm font-medium text-emerald-700">
-                            <span>Bulk Purchase Discount{discountPercent ? ` (${formatDiscountPercent(discountPercent)})` : ''}</span>
+                            <span>Automatic Random Discount{discountPercent ? ` (${formatDiscountPercent(discountPercent)})` : ''}</span>
                             <span className="whitespace-nowrap">−₹{formatRupees(discount, true)}</span>
                           </div>
                         )}
                         {subtotal !== null && shipping !== null && (
                           <div className="flex justify-between gap-4 text-sm text-gray-600">
                             <span>Shipping</span>
-                            <span className="whitespace-nowrap">₹{formatRupees(shipping, true)}</span>
+                            <span className="whitespace-nowrap">{shipping > 0 ? `₹${formatRupees(shipping, true)}` : 'Free'}</span>
                           </div>
                         )}
                         <div className="flex justify-between items-center gap-4">

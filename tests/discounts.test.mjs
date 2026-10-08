@@ -16,8 +16,8 @@ const TIERS = [
   { min_subtotal: 4000, discount_percent: 1.7 },
 ];
 
-test('shipping is a flat ₹100', () => {
-  assert.equal(SHIPPING_FEE, 100);
+test('shipping is free', () => {
+  assert.equal(SHIPPING_FEE, 0);
 });
 
 test('tier boundaries: a tier applies from exactly its threshold', () => {
@@ -120,18 +120,18 @@ test('discounts are exact to the paisa with half-up rounding', () => {
   }
 });
 
-test('order totals: discount on the subtotal only, shipping added after', () => {
+test('order totals: discount on the subtotal only, shipping is free', () => {
   assert.deepEqual(calculateOrderTotals(3000, TIERS), {
     subtotal: 3000,
     discountPercent: 1.4,
     discountAmount: 42,
-    shipping: 100,
-    total: 3058,
-    totalPaise: 305800,
+    shipping: 0,
+    total: 2958,
+    totalPaise: 295800,
     tier: TIERS[1],
   });
-  assert.equal(calculateOrderTotals(500, TIERS).totalPaise, 60000);
-  assert.equal(calculateOrderTotals(1999.99, []).totalPaise, 209999);
+  assert.equal(calculateOrderTotals(500, TIERS).totalPaise, 50000);
+  assert.equal(calculateOrderTotals(1999.99, []).totalPaise, 199999);
 });
 
 test('formatDiscountPercent', () => {

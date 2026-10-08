@@ -8,7 +8,7 @@ interface OrderTotalsProps {
 }
 
 /**
- * Subtotal / Bulk Purchase Discount / Shipping / Total, shared by the cart and
+ * Subtotal / Automatic Random Discount / Shipping / Total, shared by the cart and
  * checkout so both always show the same figures the server will charge.
  */
 const OrderTotals = ({ totals, className }: OrderTotalsProps) => (
@@ -19,13 +19,15 @@ const OrderTotals = ({ totals, className }: OrderTotalsProps) => (
     </div>
     {totals.tier && totals.discountAmount > 0 && (
       <div className="flex items-start justify-between gap-4 font-medium text-emerald-700">
-        <dt>Bulk Purchase Discount ({formatDiscountPercent(totals.discountPercent)})</dt>
+        <dt>Automatic Random Discount ({formatDiscountPercent(totals.discountPercent)})</dt>
         <dd className="whitespace-nowrap">−₹{formatRupees(totals.discountAmount, true)}</dd>
       </div>
     )}
     <div className="flex items-start justify-between gap-4">
       <dt>Shipping</dt>
-      <dd className="whitespace-nowrap font-medium text-gray-900">₹{formatRupees(totals.shipping, true)}</dd>
+      <dd className="whitespace-nowrap font-medium text-emerald-700">
+        {totals.shipping > 0 ? `₹${formatRupees(totals.shipping, true)}` : 'FREE'}
+      </dd>
     </div>
     <div className="flex items-center justify-between gap-4 border-t border-gray-100 pt-4">
       <dt className="text-base font-bold text-gray-900">Total</dt>

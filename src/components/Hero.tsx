@@ -32,7 +32,7 @@ const Hero = () => {
         </div>
 
         <div className="relative min-h-[260px] sm:min-h-[420px] lg:min-h-full">
-          <img src="/images/hero-background.png" alt="A curated selection of premium interior surface materials" className="absolute inset-0 h-full w-full object-cover" />
+          <img src="/images/hero-background.png" alt="A curated selection of premium interior surface materials" width={1280} height={704} loading="eager" decoding="async" fetchPriority="high" className="absolute inset-0 h-full w-full object-cover" />
           <div className="absolute inset-0 bg-gradient-to-t from-[#17201d]/30 via-transparent to-transparent lg:bg-gradient-to-r lg:from-[#17201d]/[0.35] lg:to-transparent" />
           <div className="absolute bottom-6 right-6 max-w-[220px] rounded-2xl border border-white/30 bg-white/[0.85] p-4 text-[#17201d] shadow-xl backdrop-blur-md sm:bottom-8 sm:right-8">
             <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#7d6a4e]">One trusted source</p>

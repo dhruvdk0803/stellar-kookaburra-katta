@@ -28,7 +28,8 @@ async function fetchAllProducts(): Promise<any[]> {
   for (;;) {
     const { data, error } = await supabase
       .from('products')
-      .select('*, categories(name, slug, parent_id), brands(name, slug)')
+      // Only the columns the list UI uses (ProductCard, filters, sort); drops description/specs/policies (~65% of the payload).
+      .select('id, name, price, image_url, images, category_id, created_at, variants, categories(name, slug, parent_id), brands(name, slug)')
       .eq('is_active', true)
       // Stable order: range pages over an unordered query can repeat or skip rows.
       .order('id')

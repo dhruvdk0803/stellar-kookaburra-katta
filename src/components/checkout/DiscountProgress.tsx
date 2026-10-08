@@ -46,7 +46,7 @@ const DiscountProgress = ({ subtotal, tiers, variant = 'card', className }: Disc
           <BadgePercent className="h-5 w-5" aria-hidden="true" />
         </div>
         <div className="min-w-0 flex-1" aria-live="polite">
-          <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">Bulk Purchase Discount</p>
+          <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">Automatic Random Discount</p>
           <p className={cn('mt-1 break-words font-medium', unlocked ? 'text-emerald-800' : 'text-gray-900')}>
             {nudge.headline}
           </p>

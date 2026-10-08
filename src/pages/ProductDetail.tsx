@@ -231,10 +231,6 @@ const ProductDetail = () => {
     setQuantity(safeQuantity);
   };
 
-  const handleBulkOrder = () => {
-    window.open('mailto:kattainterior@gmail.com?subject=' + encodeURIComponent('Bulk Order Inquiry: ' + product.name), '_blank');
-  };
-
   const handleShare = async () => {
     const result = await shareProduct(product.name, `${window.location.origin}/product/${product.id}`);
     if (result === 'copied') toast.success('Product link copied to clipboard');
@@ -373,10 +369,6 @@ const ProductDetail = () => {
                 <ShoppingCart className="mr-2 h-5 w-5" />
                 {product.stock > 0 ? 'Add to Cart' : 'Out of Stock'}
               </Button>
-              <Button variant="outline" onClick={handleBulkOrder} className="flex-1 rounded-full text-base md:text-lg py-6 sm:py-4 border-2">
-                Order Bulk
-                <MessageCircle className="ml-2 h-5 w-5" />
-              </Button>
             </div>
 
             {/* Returns & Replacement: the product's own policy text, else store-wide wording */}
@@ -406,6 +398,17 @@ const ProductDetail = () => {
                   </section>
                   <p className="text-sm">
                     <Link to="/returns" className="font-medium text-gray-900 underline underline-offset-2">See our full Returns &amp; Refunds policy</Link>
+                  </p>
+                  <p className="text-sm">
+                    <a
+                      href={`https://wa.me/918005708058?text=${encodeURIComponent(`Hi Katta Interior, I need help with a return/replacement for: ${product.name}. My order number is: `)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center font-medium text-emerald-700 underline underline-offset-2"
+                    >
+                      <MessageCircle className="mr-1.5 h-4 w-4" aria-hidden="true" />
+                      Message us on WhatsApp
+                    </a>
                   </p>
                 </AccordionContent>
               </AccordionItem>

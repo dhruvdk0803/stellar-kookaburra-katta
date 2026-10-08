@@ -12,7 +12,7 @@
 // The discount algorithm is duplicated in src/lib/discounts.ts for the
 // storefront; tests/pricing.test.mjs proves the two agree. Change both together.
 
-export const SHIPPING_PAISE = 10_000; // flat ₹100 per order
+export const SHIPPING_PAISE = 0; // shipping is free on every order
 export const MAX_CART_LINES = 50;
 export const MIN_LINE_QUANTITY = 1;
 export const MAX_LINE_QUANTITY = 100;

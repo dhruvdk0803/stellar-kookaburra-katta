@@ -107,7 +107,7 @@ test('displayed text is never empty', () => {
 test('default return wording matches the store Returns page facts', () => {
   assert.match(DEFAULT_RETURN_POLICY, /within 2 days of delivery/);
   assert.match(DEFAULT_RETURN_POLICY, /Doorskins, wall panels, laminates, and digital locks are excluded/);
-  assert.match(DEFAULT_REPLACEMENT_NOTE, /kattainterior@gmail\.com/);
+  assert.match(DEFAULT_REPLACEMENT_NOTE, /WhatsApp/);
 });
 
 test('the save payload sends only the policies that have text or must be cleared', () => {

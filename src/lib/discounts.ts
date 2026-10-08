@@ -20,7 +20,7 @@ export interface DiscountTier {
 }
 
 /** Flat shipping per order in rupees (never discounted). */
-export const SHIPPING_FEE = 100;
+export const SHIPPING_FEE = 0; // shipping is free on every order
 
 const MAX_DISCOUNT_PERCENT_HUNDREDTHS = 5000; // 50%, as enforced by the database
 

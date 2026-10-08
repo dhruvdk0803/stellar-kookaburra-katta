@@ -18,12 +18,12 @@ const InspirationGallery = () => {
 
         <div className="grid gap-4 md:grid-cols-[1.35fr_0.65fr]">
           <Link to="/projects/5" className="group relative min-h-[420px] overflow-hidden rounded-[2rem] sm:min-h-[560px]">
-            <img src="/images/gallery/warm-decor.png" alt="Warm living space finished with rich wood surfaces" loading="lazy" className="absolute inset-0 h-full w-full object-cover transition duration-700 group-hover:scale-[1.03]" />
+            <img src="/images/gallery/warm-decor.png" alt="Warm living space finished with rich wood surfaces" loading="lazy" decoding="async" className="absolute inset-0 h-full w-full object-cover transition duration-700 group-hover:scale-[1.03]" />
             <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-transparent to-transparent" />
             <p className="absolute bottom-7 left-7 text-xl text-white">Warm, tactile living</p>
           </Link>
           <Link to="/projects/6" className="group relative min-h-[360px] overflow-hidden rounded-[2rem] md:min-h-full">
-            <img src="/images/gallery/sleek-kitchen-white.png" alt="Minimal white kitchen with refined surfaces" loading="lazy" className="absolute inset-0 h-full w-full object-cover transition duration-700 group-hover:scale-[1.03]" />
+            <img src="/images/gallery/sleek-kitchen-white.png" alt="Minimal white kitchen with refined surfaces" loading="lazy" decoding="async" className="absolute inset-0 h-full w-full object-cover transition duration-700 group-hover:scale-[1.03]" />
             <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-transparent" />
             <p className="absolute bottom-7 left-7 text-xl text-white">Quiet, modern kitchens</p>
           </Link>

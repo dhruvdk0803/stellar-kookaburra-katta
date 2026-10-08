@@ -15,7 +15,7 @@ export const DEFAULT_RETURN_POLICY = [
 // Shown for products without a replacement policy of their own. Promises
 // nothing beyond what the Returns page already says.
 export const DEFAULT_REPLACEMENT_NOTE =
-  'No separate replacement policy is listed for this product. If an item arrives damaged, defective, or incorrect, email kattainterior@gmail.com with your order number and a photo of the item’s condition.';
+  'No separate replacement policy is listed for this product. If an item arrives damaged, defective, or incorrect, message us on WhatsApp (+91 80057 08058) with your order number and a photo of the item’s condition.';
 
 // NUL and other control characters (tab and newline are kept). Postgres rejects
 // NUL in text, and none of them belong in a policy.

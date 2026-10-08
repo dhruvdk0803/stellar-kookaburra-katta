@@ -117,8 +117,8 @@ test('buildCheckoutPayload omits the location when none is set and never sends a
   const payload = buildCheckoutPayload({ cart, expectedTotalPaise: totals.totalPaise, address: buildShippingAddress(FORM), phone: FORM.phone, location: null });
   assert.deepEqual(payload, {
     items: [{ product_id: 'a', quantity: 2 }, { product_id: 'b:v1', quantity: 1 }],
-    // ₹3,250 subtotal -> 1.4% tier (₹45.50 off) + ₹100 shipping.
-    expected_total_paise: 325_000 - 4_550 + 10_000,
+    // ₹3,250 subtotal -> 1.4% tier (₹45.50 off); shipping is free.
+    expected_total_paise: 325_000 - 4_550,
     address: 'Asha Verma, Shop 12, MI Road, Near Ajmeri Gate, Jaipur, Rajasthan 302001',
     phone: '9876543210',
   });

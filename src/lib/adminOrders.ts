@@ -94,7 +94,7 @@ export const formatOrderAmount = (value: unknown): string | null => {
 };
 
 /**
- * "1.4% Bulk Purchase Discount - saved ₹42", or null when the order had no
+ * "1.4% Automatic Random Discount - saved ₹42", or null when the order had no
  * discount. The amount is stored on the order; when an old order has only the
  * percent, the saving is worked out from its subtotal when that is known.
  */
@@ -114,7 +114,7 @@ export const formatOrderDiscount = (order: {
     : Number.isFinite(subtotal) && subtotal > 0
       ? Math.round(subtotal * percent) / 100
       : null;
-  const label = `${formatDiscountPercent(percent)} Bulk Purchase Discount`;
+  const label = `${formatDiscountPercent(percent)} Automatic Random Discount`;
   return saved === null ? label : `${label} - saved ${formatRupeeAmount(saved)}`;
 };
 

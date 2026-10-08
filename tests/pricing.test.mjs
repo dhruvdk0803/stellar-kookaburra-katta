@@ -54,12 +54,12 @@ test('prices a simple cart from DB prices and applies the whole-subtotal tier', 
   assert.equal(result.discountPercent, 1.4);
   assert.equal(result.discountPaise, 4200);
   assert.equal(result.shippingPaise, SHIPPING_PAISE);
-  assert.equal(SHIPPING_PAISE, 10000);
-  assert.equal(result.totalPaise, 300000 - 4200 + 10000);
+  assert.equal(SHIPPING_PAISE, 0);
+  assert.equal(result.totalPaise, 300000 - 4200);
   assert.deepEqual(result.tier, { min_subtotal: 3000, discount_percent: 1.4 });
   assert.deepEqual(result.orderItems, [{ product_id: A, quantity: 3, price: 1000, variant_label: null }]);
   assert.deepEqual(orderSummary(result), {
-    subtotal: 3000, discountPercent: 1.4, discountAmount: 42, shipping: 100, total: 3058,
+    subtotal: 3000, discountPercent: 1.4, discountAmount: 42, shipping: 0, total: 2958,
   });
 });
 
@@ -69,7 +69,7 @@ test('there is no minimum order value any more', () => {
   assert.equal(result.subtotalPaise, 4999);
   assert.equal(result.discountPaise, 0);
   assert.equal(result.tier, null);
-  assert.equal(result.totalPaise, 4999 + 10000);
+  assert.equal(result.totalPaise, 4999);
 });
 
 test('variant suffix ":vN" prices from the DB variant and records its label', () => {
@@ -171,13 +171,13 @@ test('client-supplied discounts and prices are ignored', () => {
     address: '12 MG Road, Jaipur 302001',
     phone: '98290 12345',
     discount_percent: 5,
-    expected_total_paise: 208000,
+    expected_total_paise: 198000,
   });
   assert.equal(request.ok, true);
   assert.equal('discountPercent' in request, false);
   const priced = price(request.items);
   assert.equal(priced.discountPercent, 1);
-  assert.equal(priced.totalPaise, 200000 - 2000 + 10000);
+  assert.equal(priced.totalPaise, 200000 - 2000);
   assert.equal(matchesExpectedTotal(request.expectedTotalPaise, priced), true);
 });
 
@@ -200,14 +200,14 @@ test('inactive, invalid and unsorted tiers from the database', () => {
 
 test('stale total guard returns the server figures', () => {
   const priced = price([{ product_id: A, quantity: 3 }]);
-  assert.equal(matchesExpectedTotal(305800, priced), true);
-  assert.equal(matchesExpectedTotal('305800', priced), true);
-  for (const stale of [305801, undefined, null, 'abc', 0]) {
+  assert.equal(matchesExpectedTotal(295800, priced), true);
+  assert.equal(matchesExpectedTotal('295800', priced), true);
+  for (const stale of [295801, undefined, null, 'abc', 0]) {
     assert.equal(matchesExpectedTotal(stale, priced), false, String(stale));
   }
   assert.deepEqual(staleTotalBody(priced), {
     error: 'Your order total has changed. Please review the updated total and try again.',
-    serverTotalPaise: 305800,
+    serverTotalPaise: 295800,
     discountPercent: 1.4,
     discountAmount: 42,
   });
@@ -301,7 +301,7 @@ test('PARITY: a priced cart total equals what the storefront would send', () => 
     // Storefront: subtotal summed in paise, then the lib's discount, then shipping.
     const subtotal = priced.subtotalPaise / 100;
     const discount = calculateDiscount(subtotal, TIER_ROWS.map((t) => ({ min_subtotal: Number(t.min_subtotal), discount_percent: Number(t.discount_percent) })));
-    const expectedTotalPaise = priced.subtotalPaise - Math.round(discount.amount * 100) + 10000;
+    const expectedTotalPaise = priced.subtotalPaise - Math.round(discount.amount * 100);
     assert.equal(matchesExpectedTotal(expectedTotalPaise, priced), true, JSON.stringify(items));
   }
 });

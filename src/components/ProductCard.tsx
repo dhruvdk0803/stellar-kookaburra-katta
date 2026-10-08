@@ -77,7 +77,7 @@ const ProductCard = ({ product, isInWishlist, onWishlistToggle }: ProductCardPro
   return (
     <div className="group relative bg-white rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden border border-gray-100 flex flex-col h-full">
       <Link to={`/product/${product.id}`} className="block relative overflow-hidden">
-        <img src={imageUrl} alt={product.name} loading="lazy" onError={handleImageError} className="w-full h-56 sm:h-64 object-contain bg-gray-50 p-2 group-hover:scale-105 transition-transform duration-500" />
+        <img src={imageUrl} alt={product.name} width={400} height={256} loading="lazy" decoding="async" onError={handleImageError} className="w-full h-56 sm:h-64 object-contain bg-gray-50 p-2 group-hover:scale-105 transition-transform duration-500" />
         <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors duration-300" />
       </Link>
       <Button

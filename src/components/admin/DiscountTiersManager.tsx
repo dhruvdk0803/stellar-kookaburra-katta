@@ -250,7 +250,7 @@ const DiscountTiersManager = () => {
   return (
     <Card className="border-0 shadow-sm">
       <CardHeader>
-        <CardTitle className="flex items-center"><Percent className="mr-2 h-5 w-5" /> Bulk Purchase Discount Tiers</CardTitle>
+        <CardTitle className="flex items-center"><Percent className="mr-2 h-5 w-5" /> Automatic Random Discount Tiers</CardTitle>
       </CardHeader>
       <CardContent className="space-y-5">
         <div className="space-y-2 text-sm text-gray-600">

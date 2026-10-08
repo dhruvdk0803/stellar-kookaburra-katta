@@ -79,10 +79,10 @@ test('revenue: legacy orders without payment_method keep the old rules', () => {
   assert.equal(countsAsRevenue({ status: 'cancelled' }), false);
 });
 
-test('discount text uses Bulk Purchase Discount wording with the saved amount', () => {
-  assert.equal(formatOrderDiscount({ discount_percent: 1.4, discount_amount: 42 }), '1.4% Bulk Purchase Discount - saved ₹42');
-  assert.equal(formatOrderDiscount({ discount_percent: '1', discount_amount: '20.50' }), '1% Bulk Purchase Discount - saved ₹20.50');
-  assert.equal(formatOrderDiscount({ discount_percent: 1.7, discount_amount: 1234.5 }), '1.7% Bulk Purchase Discount - saved ₹1,234.50');
+test('discount text uses Automatic Random Discount wording with the saved amount', () => {
+  assert.equal(formatOrderDiscount({ discount_percent: 1.4, discount_amount: 42 }), '1.4% Automatic Random Discount - saved ₹42');
+  assert.equal(formatOrderDiscount({ discount_percent: '1', discount_amount: '20.50' }), '1% Automatic Random Discount - saved ₹20.50');
+  assert.equal(formatOrderDiscount({ discount_percent: 1.7, discount_amount: 1234.5 }), '1.7% Automatic Random Discount - saved ₹1,234.50');
   for (const text of [formatOrderDiscount({ discount_percent: 1.4, discount_amount: 42 })]) {
     assert.ok(!/coupon|surprise/i.test(text));
   }
@@ -94,8 +94,8 @@ test('discount text copes with legacy and partial rows', () => {
   assert.equal(formatOrderDiscount({ discount_percent: null }), null);
   assert.equal(formatOrderDiscount({ discount_percent: 'abc' }), null);
   // percent known, amount missing: worked out from the subtotal when possible, else percent only
-  assert.equal(formatOrderDiscount({ discount_percent: 1.4, subtotal_amount: 3000 }), '1.4% Bulk Purchase Discount - saved ₹42');
-  assert.equal(formatOrderDiscount({ discount_percent: 1.4, discount_amount: null }), '1.4% Bulk Purchase Discount');
+  assert.equal(formatOrderDiscount({ discount_percent: 1.4, subtotal_amount: 3000 }), '1.4% Automatic Random Discount - saved ₹42');
+  assert.equal(formatOrderDiscount({ discount_percent: 1.4, discount_amount: null }), '1.4% Automatic Random Discount');
 });
 
 test('payment status wording', () => {

@@ -25,7 +25,7 @@ const Returns = () => {
 
             <section>
               <h2 className="text-2xl font-semibold text-gray-900 mb-4">3. Damages and Issues</h2>
-              <p className="mb-4">Please inspect your order when it arrives. If any item, including an excluded item, is damaged, defective, or incorrect, contact us immediately so we can evaluate the issue. Email kattainterior@gmail.com with your order number and a photo of the item's condition.</p>
+              <p className="mb-4">Please inspect your order when it arrives. If any item, including an excluded item, is damaged, defective, or incorrect, contact us immediately so we can evaluate the issue. Message us on <a href="https://wa.me/918005708058?text=Hi%20Katta%20Interior%2C%20I%20need%20help%20with%20a%20return%20or%20replacement" target="_blank" rel="noopener noreferrer" className="font-medium underline underline-offset-2">WhatsApp (+91 80057 08058)</a> with your order number and a photo of the item's condition.</p>
               <p><strong>For wrong and defective products the replacement delivery timeframe will be 7-14 days.</strong></p>
             </section>
 
