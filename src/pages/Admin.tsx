@@ -18,7 +18,7 @@ import { getSavedVariantImage } from '@/lib/productImages';
 import { SpecRow, mergeSpecsForSave, splitSpecsForEditing, validateSpecRows } from '@/lib/specs';
 import BulkProductUpload from '@/components/admin/BulkProductUpload';
 import ProductPolicyFields from '@/components/admin/ProductPolicyFields';
-import DiscountTiersManager from '@/components/admin/DiscountTiersManager';
+import RandomDiscountSettings from '@/components/admin/RandomDiscountSettings';
 import BrandLogo from '@/components/BrandLogo';
 import OpenInMapsLink from '@/components/OpenInMapsLink';
 import { buildPolicyPayload } from '@/lib/policies';
@@ -1533,7 +1533,7 @@ const Admin = () => {
 
           {/* DISCOUNTS TAB */}
           <TabsContent value="discounts">
-            <DiscountTiersManager />
+            <RandomDiscountSettings />
           </TabsContent>
         </Tabs>
       </div>

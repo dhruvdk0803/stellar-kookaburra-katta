@@ -3,7 +3,7 @@
 // Node tests can import it with --experimental-strip-types.
 //
 // Any `discount_percent` sent by the browser is ignored: the server computes
-// the discount from the discount_tiers table (see pricing.ts).
+// the discount via get_cart_discount_percent() (see pricing.ts).
 import {
   type CartLine,
   MAX_CART_LINES,

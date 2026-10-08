@@ -7,9 +7,8 @@
  * nothing here decides what the customer pays, it only mirrors the server and
  * validates input the same way supabase/functions/_shared/checkout.ts does.
  */
-import { getActiveTier, getNextTier, formatDiscountPercent, type DiscountTier } from './discounts.ts';
+import { formatDiscountPercent } from './discounts.ts';
 import { isValidCoordinate, type DeliveryLocation } from './location.ts';
-import { formatRupees } from './money.ts';
 
 /** Same bounds as the server (supabase/functions/_shared/checkout.ts). */
 export const MIN_ADDRESS_LENGTH = 10;
@@ -122,8 +121,8 @@ export interface CheckoutPayload {
 
 /**
  * Request body for the 'razorpay-create-order' and 'place-upi-order' edge
- * functions. Never carries a discount: the server computes it from the active
- * tiers and answers HTTP 409 when `expected_total_paise` no longer matches.
+ * functions. Never carries a discount: the server decides the
+ * random percent from the cart and answers HTTP 409 when `expected_total_paise` no longer matches.
  * The map pin is included only when a valid location was chosen.
  */
 export const buildCheckoutPayload = ({
@@ -160,7 +159,7 @@ export type CheckoutFailure =
 
 /**
  * Classify an edge-function error response. HTTP 409 WITH `serverTotalPaise`
- * means the total the page showed is stale (discount tiers or prices changed);
+ * means the total the page showed is stale (the random discount or prices changed);
  * a 409 without it is a stock conflict and keeps the server's own message.
  */
 export const classifyCheckoutFailure = (status: number | null, body: unknown, fallback: string): CheckoutFailure => {
@@ -175,67 +174,30 @@ export const classifyCheckoutFailure = (status: number | null, body: unknown, fa
 
 export const STALE_TOTAL_TOAST = 'Your cart total changed (discount or price update). Please review the new total and try again.';
 
-export interface DiscountNudge {
-  /** locked: no tier yet; unlocked: a tier applies and a better one exists; top: best tier reached. */
-  status: 'locked' | 'unlocked' | 'top';
-  headline: string;
-  /** "Add ₹Y more to unlock Z%." while a better tier exists after one is unlocked. */
-  nextStep: string | null;
-  /** 0..1 progress of the subtotal toward the next tier's threshold (1 at the top tier). */
-  progress: number;
-  activePercent: number | null;
-  nextPercent: number | null;
-  amountToUnlock: number | null;
-}
+export type DiscountBanner =
+  | { status: 'loading'; message: string; hint: null; percent: number }
+  | { status: 'applied'; message: string; hint: string; percent: number };
 
-/** ₹1,500 or ₹1,499.50: paise only when the amount has them. */
-const formatAmount = (amount: number): string => `₹${formatRupees(amount, !Number.isInteger(amount))}`;
+export const DISCOUNT_LOADING_MESSAGE = 'Calculating your automatic random discount…';
+export const DISCOUNT_CHANGE_HINT = 'Your discount can change when you change your cart';
 
 /**
- * Cart-value discount incentive copy. Every number comes from `tiers`
- * (admin-editable); with no tiers or an empty cart there is nothing to show.
+ * Copy for the Automatic Random Discount banner. `percent` is the server-decided
+ * value from useCartDiscount. Returns null when there is nothing to say (empty
+ * cart, no discount, or the feature is off / unavailable): never an "add more to
+ * unlock" nudge, because there are no tiers and no minimum order.
  */
-export const getDiscountNudge = (subtotal: number, tiers: DiscountTier[]): DiscountNudge | null => {
-  if (!Number.isFinite(subtotal) || subtotal <= 0) return null;
-  const active = getActiveTier(subtotal, tiers);
-  const next = getNextTier(subtotal, tiers);
-  if (!active && !next) return null;
-
-  const progress = next ? Math.min(1, Math.max(0, subtotal / next.tier.min_subtotal)) : 1;
-  const nextPercent = next ? next.tier.discount_percent : null;
-  const amountToUnlock = next ? next.amountToUnlock : null;
-
-  if (!active && next) {
-    return {
-      status: 'locked',
-      headline: `Add ${formatAmount(next.amountToUnlock)} more to unlock ${formatDiscountPercent(next.tier.discount_percent)} off your entire order.`,
-      nextStep: null,
-      progress,
-      activePercent: null,
-      nextPercent,
-      amountToUnlock,
-    };
-  }
-
-  const activePercent = active!.discount_percent;
-  if (next) {
-    return {
-      status: 'unlocked',
-      headline: `You've unlocked ${formatDiscountPercent(activePercent)} off your entire order.`,
-      nextStep: `Add ${formatAmount(next.amountToUnlock)} more to unlock ${formatDiscountPercent(next.tier.discount_percent)}.`,
-      progress,
-      activePercent,
-      nextPercent,
-      amountToUnlock,
-    };
-  }
+export const getDiscountBanner = (
+  percent: number,
+  { isLoading, hasItems }: { isLoading: boolean; hasItems: boolean },
+): DiscountBanner | null => {
+  if (!hasItems) return null;
+  if (isLoading) return { status: 'loading', message: DISCOUNT_LOADING_MESSAGE, hint: null, percent };
+  if (!Number.isFinite(percent) || percent <= 0) return null;
   return {
-    status: 'top',
-    headline: `You've unlocked our best discount (${formatDiscountPercent(activePercent)}).`,
-    nextStep: null,
-    progress: 1,
-    activePercent,
-    nextPercent: null,
-    amountToUnlock: null,
+    status: 'applied',
+    message: `You got ${formatDiscountPercent(percent)} automatic random discount on this order!`,
+    hint: DISCOUNT_CHANGE_HINT,
+    percent,
   };
 };

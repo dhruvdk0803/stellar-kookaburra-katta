@@ -4,142 +4,87 @@ import {
   calculateDiscount,
   calculateOrderTotals,
   formatDiscountPercent,
-  getActiveTier,
-  getNextTier,
+  MAX_DISCOUNT_PERCENT,
   SHIPPING_FEE,
-  sortTiers,
 } from '../src/lib/discounts.ts';
 
-const TIERS = [
-  { min_subtotal: 2000, discount_percent: 1 },
-  { min_subtotal: 3000, discount_percent: 1.4 },
-  { min_subtotal: 4000, discount_percent: 1.7 },
-];
-
-test('shipping is free', () => {
+test('shipping is free and the cap is 5%', () => {
   assert.equal(SHIPPING_FEE, 0);
+  assert.equal(MAX_DISCOUNT_PERCENT, 5);
 });
 
-test('tier boundaries: a tier applies from exactly its threshold', () => {
-  assert.equal(getActiveTier(1999.99, TIERS), null);
-  assert.deepEqual(getActiveTier(2000, TIERS), { min_subtotal: 2000, discount_percent: 1 });
-  assert.deepEqual(getActiveTier(2999.99, TIERS), { min_subtotal: 2000, discount_percent: 1 });
-  assert.deepEqual(getActiveTier(3000, TIERS), { min_subtotal: 3000, discount_percent: 1.4 });
-  assert.deepEqual(getActiveTier(3999.99, TIERS), { min_subtotal: 3000, discount_percent: 1.4 });
-  assert.deepEqual(getActiveTier(4000, TIERS), { min_subtotal: 4000, discount_percent: 1.7 });
-  assert.deepEqual(getActiveTier(250000, TIERS), { min_subtotal: 4000, discount_percent: 1.7 });
+test('calculateDiscount applies the percent to the whole subtotal, no minimum order', () => {
+  assert.deepEqual(calculateDiscount(3000, 2.37), { percent: 2.37, amount: 71.1 });
+  assert.deepEqual(calculateDiscount(100, 5), { percent: 5, amount: 5 });
+  // No minimum order: even a tiny cart gets its percent.
+  assert.deepEqual(calculateDiscount(10, 3), { percent: 3, amount: 0.3 });
 });
 
-test('the percent applies to the whole subtotal, never marginally or stacked', () => {
-  assert.deepEqual(calculateDiscount(1999.99, TIERS), { percent: 0, amount: 0, tier: null });
-  assert.deepEqual(calculateDiscount(2000, TIERS), { percent: 1, amount: 20, tier: TIERS[0] });
-  assert.deepEqual(calculateDiscount(3000, TIERS), { percent: 1.4, amount: 42, tier: TIERS[1] });
-  assert.deepEqual(calculateDiscount(4000, TIERS), { percent: 1.7, amount: 68, tier: TIERS[2] });
-  // 1.7% of 5000 = 85 (a marginal scheme would give 20 + 14 + 17 = 51).
-  assert.equal(calculateDiscount(5000, TIERS).amount, 85);
+test('calculateDiscount rounds the amount to the nearest paisa (half up in paise)', () => {
+  // 1234.56 * 2.37% = 29.259... -> 29.26
+  assert.equal(calculateDiscount(1234.56, 2.37).amount, 29.26);
+  // 0.5 paise rounds up: 10.10 at 2.5% = 25.25 paise -> 25 paise; 10.30 at 2.5% = 25.75 -> 26
+  assert.equal(calculateDiscount(10.1, 2.5).amount, 0.25);
+  assert.equal(calculateDiscount(10.3, 2.5).amount, 0.26);
+  // no float drift: 0.1 + 0.2 style subtotals
+  assert.equal(calculateDiscount(0.1 + 0.2, 5).amount, 0.02);
 });
 
-test('no tiers, empty or invalid input means no discount', () => {
-  for (const tiers of [[], null, undefined]) {
-    assert.deepEqual(calculateDiscount(5000, tiers), { percent: 0, amount: 0, tier: null });
-    assert.equal(getActiveTier(5000, tiers), null);
-    assert.equal(getNextTier(5000, tiers), null);
+test('calculateDiscount clamps the percent to [0, 5] and ignores bad input', () => {
+  assert.deepEqual(calculateDiscount(1000, 50), { percent: 5, amount: 50 });
+  assert.deepEqual(calculateDiscount(1000, -3), { percent: 0, amount: 0 });
+  for (const bad of [NaN, Infinity, undefined, null, 'abc']) {
+    assert.deepEqual(calculateDiscount(1000, bad), { percent: 0, amount: 0 }, String(bad));
   }
-  for (const subtotal of [0, -10, Number.NaN, Number.POSITIVE_INFINITY]) {
-    assert.deepEqual(calculateDiscount(subtotal, TIERS), { percent: 0, amount: 0, tier: null });
-  }
+  assert.deepEqual(calculateDiscount(1000, '2.5'), { percent: 2.5, amount: 25 });
 });
 
-test('sortTiers sorts ascending and drops inactive, invalid and out-of-range tiers', () => {
-  const messy = [
-    { min_subtotal: 4000, discount_percent: 1.7 },
-    { min_subtotal: 2000, discount_percent: 1 },
-    { min_subtotal: 0, discount_percent: 5 },
-    { min_subtotal: -100, discount_percent: 5 },
-    { min_subtotal: 1000, discount_percent: 0 },
-    { min_subtotal: 1500, discount_percent: 50.01 },
-    { min_subtotal: 1600, discount_percent: Number.NaN },
-    { min_subtotal: Number.NaN, discount_percent: 2 },
-    { min_subtotal: 2500, discount_percent: 3, is_active: false },
-    null,
-    'junk',
-    { min_subtotal: 3000, discount_percent: 1.4 },
-  ];
-  assert.deepEqual(sortTiers(messy), TIERS);
-  // A 50% tier is the maximum allowed and is kept.
-  assert.deepEqual(sortTiers([{ min_subtotal: 100, discount_percent: 50 }]), [{ min_subtotal: 100, discount_percent: 50 }]);
+test('calculateDiscount gives nothing on an empty or invalid subtotal', () => {
+  assert.equal(calculateDiscount(0, 3).amount, 0);
+  assert.equal(calculateDiscount(-100, 3).amount, 0);
+  assert.equal(calculateDiscount(NaN, 3).amount, 0);
 });
 
-test('unsorted and duplicate tiers: the highest threshold applies; a duplicate keeps the higher percent', () => {
-  const unsorted = [TIERS[2], TIERS[0], TIERS[1]];
-  assert.equal(calculateDiscount(3500, unsorted).percent, 1.4);
-  const duplicates = [
-    { min_subtotal: 2000, discount_percent: 1 },
-    { min_subtotal: 2000, discount_percent: 1.2 },
-    { min_subtotal: 3000, discount_percent: 1.4 },
-  ];
-  assert.deepEqual(sortTiers(duplicates), [
-    { min_subtotal: 2000, discount_percent: 1.2 },
-    { min_subtotal: 3000, discount_percent: 1.4 },
-  ]);
-  assert.equal(calculateDiscount(2500, duplicates).amount, 30);
-});
-
-test('inactive tiers are ignored even when passed in', () => {
-  const tiers = [...TIERS, { min_subtotal: 5000, discount_percent: 10, is_active: false }];
-  assert.equal(calculateDiscount(6000, tiers).percent, 1.7);
-  assert.equal(getNextTier(4500, tiers), null);
-});
-
-test('next-tier hint: what to add to unlock the next tier', () => {
-  assert.deepEqual(getNextTier(0, TIERS), { tier: TIERS[0], amountToUnlock: 2000 });
-  assert.deepEqual(getNextTier(1500, TIERS), { tier: TIERS[0], amountToUnlock: 500 });
-  assert.deepEqual(getNextTier(1999.99, TIERS), { tier: TIERS[0], amountToUnlock: 0.01 });
-  assert.deepEqual(getNextTier(2000, TIERS), { tier: TIERS[1], amountToUnlock: 1000 });
-  assert.deepEqual(getNextTier(2999.99, TIERS), { tier: TIERS[1], amountToUnlock: 0.01 });
-  assert.deepEqual(getNextTier(3210.55, TIERS), { tier: TIERS[2], amountToUnlock: 789.45 });
-  assert.equal(getNextTier(4000, TIERS), null);
-  assert.equal(getNextTier(10000, TIERS), null);
-});
-
-test('discounts are exact to the paisa with half-up rounding', () => {
-  // 1% of 2000.50 = 20.005 -> 20.01
-  assert.equal(calculateDiscount(2000.5, TIERS).amount, 20.01);
-  // 1% of 2000.49 = 20.0049 -> 20.00
-  assert.equal(calculateDiscount(2000.49, TIERS).amount, 20);
-  // 1.4% of 3333.33 = 46.66662 -> 46.67
-  assert.equal(calculateDiscount(3333.33, TIERS).amount, 46.67);
-  // 1.7% of 4567.89 = 77.65413 -> 77.65
-  assert.equal(calculateDiscount(4567.89, TIERS).amount, 77.65);
-  // Float noise from summing cart prices does not change the result.
-  assert.equal(calculateDiscount(0.1 * 3 * 10000, TIERS).amount, calculateDiscount(3000, TIERS).amount);
-  // Amounts are always whole paise.
-  for (let rupees = 1990; rupees < 4100; rupees += 7.37) {
-    const { amount } = calculateDiscount(rupees, TIERS);
-    assert.equal(Math.round(amount * 100) / 100, amount);
-  }
-});
-
-test('order totals: discount on the subtotal only, shipping is free', () => {
-  assert.deepEqual(calculateOrderTotals(3000, TIERS), {
-    subtotal: 3000,
-    discountPercent: 1.4,
-    discountAmount: 42,
+test('calculateOrderTotals: discount comes off the subtotal and shipping is free', () => {
+  const totals = calculateOrderTotals(3250, 2.37);
+  assert.deepEqual(totals, {
+    subtotal: 3250,
+    discountPercent: 2.37,
+    discountAmount: 77.03, // 325000 * 237 / 10000 = 7702.5 paise -> 7703
     shipping: 0,
-    total: 2958,
-    totalPaise: 295800,
-    tier: TIERS[1],
+    total: 3172.97,
+    totalPaise: 317_297,
   });
-  assert.equal(calculateOrderTotals(500, TIERS).totalPaise, 50000);
-  assert.equal(calculateOrderTotals(1999.99, []).totalPaise, 199999);
+  assert.equal('tier' in totals, false);
 });
 
-test('formatDiscountPercent', () => {
-  assert.equal(formatDiscountPercent(1), '1%');
+test('calculateOrderTotals at 0% is just the subtotal', () => {
+  assert.deepEqual(calculateOrderTotals(1999.99, 0), {
+    subtotal: 1999.99,
+    discountPercent: 0,
+    discountAmount: 0,
+    shipping: 0,
+    total: 1999.99,
+    totalPaise: 199_999,
+  });
+  assert.equal(calculateOrderTotals(0, 4).totalPaise, 0);
+});
+
+test('totalPaise is an integer and always subtotal - discount', () => {
+  for (const [subtotal, percent] of [[0.01, 5], [99.99, 1.01], [123456.78, 4.99], [5, 0.01]]) {
+    const t = calculateOrderTotals(subtotal, percent);
+    assert.ok(Number.isInteger(t.totalPaise));
+    assert.equal(t.totalPaise, Math.round(subtotal * 100) - Math.round(t.discountAmount * 100));
+    assert.ok(t.discountAmount <= subtotal * 0.05 + 0.01);
+  }
+});
+
+test('formatDiscountPercent keeps at most 2 decimals and trims trailing zeros', () => {
+  assert.equal(formatDiscountPercent(5), '5%');
+  assert.equal(formatDiscountPercent(2.37), '2.37%');
+  assert.equal(formatDiscountPercent(2.5), '2.5%');
   assert.equal(formatDiscountPercent(1.4), '1.4%');
-  assert.equal(formatDiscountPercent(1.7), '1.7%');
-  assert.equal(formatDiscountPercent(1.75), '1.75%');
-  assert.equal(formatDiscountPercent(1.5), '1.5%');
+  assert.equal(formatDiscountPercent(2.3749), '2.37%');
   assert.equal(formatDiscountPercent(0), '0%');
-  assert.equal(formatDiscountPercent(Number.NaN), '0%');
+  assert.equal(formatDiscountPercent(NaN), '0%');
 });

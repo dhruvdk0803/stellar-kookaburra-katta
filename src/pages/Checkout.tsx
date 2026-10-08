@@ -35,7 +35,7 @@ import {
 } from '@/lib/checkout';
 import type { DeliveryLocation } from '@/lib/location';
 import type { PaymentMethod } from '@/lib/paymentMethods';
-import { DISCOUNT_TIERS_QUERY_KEY, useDiscountTiers } from '@/hooks/useDiscountTiers';
+import { CART_DISCOUNT_QUERY_KEY, useCartDiscount } from '@/hooks/useCartDiscount';
 
 declare global {
   interface RazorpayPaymentResponse {
@@ -141,7 +141,6 @@ const Field = ({ id, label, optional = false, className, children, after }: Fiel
 const Checkout = () => {
   const { cart, clearCart } = useCart();
   const { user, isLoading } = useAuth();
-  const { tiers, isLoading: tiersLoading } = useDiscountTiers();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [form, setForm] = useState<CheckoutFormFields>(EMPTY_CHECKOUT_FORM);
@@ -152,10 +151,12 @@ const Checkout = () => {
   // Synchronous guard: a fast double click can fire twice before React re-renders the disabled button.
   const submittingRef = useRef(false);
 
-  // Mirrors the server's pricing exactly (whole paise, active tiers, flat shipping);
-  // the edge function recomputes it and rejects a mismatch with HTTP 409.
+  // The server decides the random discount percent for this exact cart; the
+  // rupee maths mirrors the server (whole paise, free shipping) and the edge
+  // function recomputes everything, rejecting a mismatch with HTTP 409.
+  const { percent: discountPercent, isLoading: discountLoading } = useCartDiscount(cart);
   const subtotal = getCartSubtotal(cart);
-  const totals = calculateOrderTotals(subtotal, tiers);
+  const totals = calculateOrderTotals(subtotal, discountPercent);
   const isUpiOnDelivery = paymentMethod === 'upi_on_delivery';
   const pinInvalid = pinTouched && form.pin !== '' && !isValidPin(form.pin);
 
@@ -171,15 +172,15 @@ const Checkout = () => {
 
   const handleStaleTotal = () => {
     toast.error(STALE_TOTAL_TOAST);
-    // Refetch the tiers so the summary (and the next attempt) shows the server's figures.
-    void queryClient.invalidateQueries({ queryKey: DISCOUNT_TIERS_QUERY_KEY });
+    // Refetch the discount so the summary (and the next attempt) shows the server's figures.
+    void queryClient.invalidateQueries({ queryKey: CART_DISCOUNT_QUERY_KEY });
   };
 
   /** Returns true once the Razorpay window owns the flow (it unlocks the button itself on dismiss/failure). */
   const startRazorpayPayment = async (payload: CheckoutPayload): Promise<boolean> => {
     await ensureRazorpayScript();
     // Create the Razorpay order server-side. The Edge Function recomputes the
-    // total from DB prices and the active discount tiers, creates the pending
+    // total from DB prices and the server-decided random discount, creates the pending
     // order, and returns the Razorpay key id + order id needed to open checkout.
     const { data, error } = await supabase.functions.invoke('razorpay-create-order', { body: payload });
 
@@ -286,7 +287,7 @@ const Checkout = () => {
       toast.error('Your cart is empty.');
       return;
     }
-    if (tiersLoading) return;
+    if (discountLoading) return;
 
     const problem = validateCheckoutForm(form);
     if (problem) {
@@ -531,11 +532,12 @@ const Checkout = () => {
                   ))}
                 </div>
                 <div className="border-t border-gray-100 pt-4">
-                  <OrderTotals totals={totals} />
+                  <OrderTotals totals={totals} updating={discountLoading} />
                   <DiscountProgress
                     variant="inline"
-                    subtotal={subtotal}
-                    tiers={tiers}
+                    percent={discountPercent}
+                    isLoading={discountLoading}
+                    hasItems={cart.length > 0}
                     className="mt-4 rounded-lg bg-emerald-50 px-3 py-2"
                   />
                 </div>
@@ -544,8 +546,8 @@ const Checkout = () => {
 
             <Button
               type="submit"
-              disabled={isSubmitting || cart.length === 0 || tiersLoading}
-              aria-busy={isSubmitting || tiersLoading}
+              disabled={isSubmitting || cart.length === 0 || discountLoading}
+              aria-busy={isSubmitting || discountLoading}
               className="w-full rounded-full bg-primary hover:bg-primary/90 text-primary-foreground text-lg py-6 shadow-lg"
             >
               {isSubmitting ? (
@@ -553,7 +555,7 @@ const Checkout = () => {
                   <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />
                   <span className="sr-only">{isUpiOnDelivery ? 'Placing your order' : 'Processing payment'}</span>
                 </>
-              ) : tiersLoading ? (
+              ) : discountLoading ? (
                 <>
                   <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />
                   Updating total…

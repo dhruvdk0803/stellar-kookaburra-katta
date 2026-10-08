@@ -6,7 +6,7 @@ import {
   classifyCheckoutFailure,
   EMPTY_CHECKOUT_FORM,
   getCartSubtotal,
-  getDiscountNudge,
+  getDiscountBanner,
   isValidPhone,
   isValidPin,
   MAX_ADDRESS_LENGTH,
@@ -14,12 +14,6 @@ import {
   validateCheckoutForm,
 } from '../src/lib/checkout.ts';
 import { calculateOrderTotals } from '../src/lib/discounts.ts';
-
-const TIERS = [
-  { min_subtotal: 2000, discount_percent: 1 },
-  { min_subtotal: 3000, discount_percent: 1.4 },
-  { min_subtotal: 4000, discount_percent: 1.7 },
-];
 
 const FORM = {
   name: 'Asha Verma',
@@ -113,11 +107,11 @@ test('getCartSubtotal sums in whole paise (no float drift)', () => {
 
 test('buildCheckoutPayload omits the location when none is set and never sends a discount', () => {
   const cart = [{ id: 'a', name: 'x', price: 1500, quantity: 2, image: '' }, { id: 'b:v1', name: 'y', price: 250, quantity: 1, image: '' }];
-  const totals = calculateOrderTotals(getCartSubtotal(cart), TIERS);
+  const totals = calculateOrderTotals(getCartSubtotal(cart), 1.4);
   const payload = buildCheckoutPayload({ cart, expectedTotalPaise: totals.totalPaise, address: buildShippingAddress(FORM), phone: FORM.phone, location: null });
   assert.deepEqual(payload, {
     items: [{ product_id: 'a', quantity: 2 }, { product_id: 'b:v1', quantity: 1 }],
-    // ₹3,250 subtotal -> 1.4% tier (₹45.50 off); shipping is free.
+    // ₹3,250 subtotal at a 1.4% random discount (₹45.50 off); shipping is free.
     expected_total_paise: 325_000 - 4_550,
     address: 'Asha Verma, Shop 12, MI Road, Near Ajmeri Gate, Jaipur, Rajasthan 302001',
     phone: '9876543210',
@@ -175,43 +169,35 @@ test('classifyCheckoutFailure detects a stale total only for 409 + serverTotalPa
   assert.deepEqual(classifyCheckoutFailure(409, { serverTotalPaise: null }, 'fallback'), { kind: 'error', message: 'fallback' });
 });
 
-// ---------------------------------------------------------------- discount nudge
+// ---------------------------------------------------------------- discount banner
 
-test('getDiscountNudge: nothing to show without tiers or with an empty cart', () => {
-  assert.equal(getDiscountNudge(5000, []), null);
-  assert.equal(getDiscountNudge(0, TIERS), null);
-  assert.equal(getDiscountNudge(NaN, TIERS), null);
+test('getDiscountBanner: nothing for an empty cart', () => {
+  assert.equal(getDiscountBanner(2.37, { isLoading: false, hasItems: false }), null);
+  assert.equal(getDiscountBanner(0, { isLoading: true, hasItems: false }), null);
 });
 
-test('getDiscountNudge: below the first tier', () => {
-  const nudge = getDiscountNudge(500, TIERS);
-  assert.equal(nudge.status, 'locked');
-  assert.equal(nudge.headline, 'Add ₹1,500 more to unlock 1% off your entire order.');
-  assert.equal(nudge.nextStep, null);
-  assert.equal(nudge.progress, 0.25);
-  assert.equal(getDiscountNudge(1999.5, TIERS).headline, 'Add ₹0.50 more to unlock 1% off your entire order.');
+test('getDiscountBanner: calculating message while the server decides', () => {
+  const banner = getDiscountBanner(1.2, { isLoading: true, hasItems: true });
+  assert.equal(banner.status, 'loading');
+  assert.equal(banner.message, 'Calculating your automatic random discount…');
+  assert.equal(banner.hint, null);
 });
 
-test('getDiscountNudge: unlocked with a better tier ahead', () => {
-  const nudge = getDiscountNudge(3000, TIERS);
-  assert.equal(nudge.status, 'unlocked');
-  assert.equal(nudge.headline, "You've unlocked 1.4% off your entire order.");
-  assert.equal(nudge.nextStep, 'Add ₹1,000 more to unlock 1.7%.');
-  assert.equal(nudge.progress, 0.75);
-  assert.equal(getDiscountNudge(2000, TIERS).headline, "You've unlocked 1% off your entire order.");
+test('getDiscountBanner: friendly message with the percent and the change-with-cart hint', () => {
+  const banner = getDiscountBanner(2.37, { isLoading: false, hasItems: true });
+  assert.equal(banner.status, 'applied');
+  assert.equal(banner.message, 'You got 2.37% automatic random discount on this order!');
+  assert.equal(banner.hint, 'Your discount can change when you change your cart');
+  assert.equal(getDiscountBanner(5, { isLoading: false, hasItems: true }).message, 'You got 5% automatic random discount on this order!');
 });
 
-test('getDiscountNudge: top tier', () => {
-  const nudge = getDiscountNudge(4000, TIERS);
-  assert.equal(nudge.status, 'top');
-  assert.equal(nudge.headline, "You've unlocked our best discount (1.7%).");
-  assert.equal(nudge.nextStep, null);
-  assert.equal(nudge.progress, 1);
-  assert.equal(getDiscountNudge(250000, TIERS).status, 'top');
-});
-
-test('getDiscountNudge copy follows admin-edited tiers (no hard-coded numbers)', () => {
-  const tiers = [{ min_subtotal: 10000, discount_percent: 2.5 }];
-  assert.equal(getDiscountNudge(7500, tiers).headline, 'Add ₹2,500 more to unlock 2.5% off your entire order.');
-  assert.equal(getDiscountNudge(10000, tiers).headline, "You've unlocked our best discount (2.5%).");
+test('getDiscountBanner: silent when there is no discount and never an "unlock" nudge', () => {
+  for (const percent of [0, -1, NaN]) {
+    assert.equal(getDiscountBanner(percent, { isLoading: false, hasItems: true }), null);
+  }
+  const text = JSON.stringify([
+    getDiscountBanner(3, { isLoading: false, hasItems: true }),
+    getDiscountBanner(3, { isLoading: true, hasItems: true }),
+  ]);
+  assert.equal(/unlock|add ₹|more to/i.test(text), false);
 });

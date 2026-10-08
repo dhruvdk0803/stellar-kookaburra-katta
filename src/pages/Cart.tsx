@@ -6,21 +6,22 @@ import { Button } from '@/components/ui/button';
 import { Trash2, ArrowRight, ShoppingCart } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { formatRupees } from '@/lib/money';
-import { calculateOrderTotals, SHIPPING_FEE } from '@/lib/discounts';
+import { calculateOrderTotals } from '@/lib/discounts';
 import { getCartSubtotal } from '@/lib/checkout';
-import { useDiscountTiers } from '@/hooks/useDiscountTiers';
+import { useCartDiscount } from '@/hooks/useCartDiscount';
 import DiscountProgress from '@/components/checkout/DiscountProgress';
 import OrderTotals from '@/components/checkout/OrderTotals';
 
 const Cart = () => {
   const { cart, updateQuantity, removeFromCart, clearCart } = useCart();
-  const { tiers } = useDiscountTiers();
+  const { percent, isLoading: discountLoading } = useCartDiscount(cart);
 
-  // Derived on every render from the cart, so the discount and banner follow
-  // each add / remove / quantity change. Same maths as the server (whole paise);
-  // GST is included in product prices and shipping is a flat fee.
+  // The random discount percent is decided by the server for this exact cart
+  // (useCartDiscount) and is re-asked on every add / remove / quantity change.
+  // Rupee maths is the same as the server's (whole paise); GST is included in
+  // product prices and shipping is free.
   const subtotal = getCartSubtotal(cart);
-  const totals = calculateOrderTotals(subtotal, tiers);
+  const totals = calculateOrderTotals(subtotal, percent);
 
   if (cart.length === 0) {
     return (
@@ -53,7 +54,7 @@ const Cart = () => {
           <h1 className="text-3xl font-playfair font-bold text-gray-900 mb-8">Shopping Cart</h1>
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <div className="lg:col-span-2 space-y-4">
-              <DiscountProgress subtotal={subtotal} tiers={tiers} />
+              <DiscountProgress percent={percent} isLoading={discountLoading} hasItems={cart.length > 0} />
               {cart.map((item) => (
                 <div key={item.id} className="flex flex-col sm:flex-row items-start sm:items-center gap-4 p-4 bg-white border border-gray-100 rounded-2xl shadow-sm relative">
                   <img src={item.image} alt={item.name} className="w-full sm:w-24 h-40 sm:h-24 object-cover rounded-xl flex-shrink-0" />
@@ -109,7 +110,7 @@ const Cart = () => {
             <div className="space-y-6">
               <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 sticky top-24">
                 <h2 className="text-xl font-semibold text-gray-900 mb-6">Order Summary</h2>
-                <OrderTotals totals={totals} />
+                <OrderTotals totals={totals} updating={discountLoading} />
 
                 <div className="mt-8 space-y-3">
                   <Button asChild className="w-full rounded-full bg-primary hover:bg-primary/90 text-primary-foreground py-6 text-lg flex items-center justify-center gap-2 shadow-md">

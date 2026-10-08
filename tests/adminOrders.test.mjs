@@ -82,6 +82,7 @@ test('revenue: legacy orders without payment_method keep the old rules', () => {
 test('discount text uses Automatic Random Discount wording with the saved amount', () => {
   assert.equal(formatOrderDiscount({ discount_percent: 1.4, discount_amount: 42 }), '1.4% Automatic Random Discount - saved ₹42');
   assert.equal(formatOrderDiscount({ discount_percent: '1', discount_amount: '20.50' }), '1% Automatic Random Discount - saved ₹20.50');
+  assert.equal(formatOrderDiscount({ discount_percent: 2.37, discount_amount: 71.1 }), '2.37% Automatic Random Discount - saved ₹71.10');
   assert.equal(formatOrderDiscount({ discount_percent: 1.7, discount_amount: 1234.5 }), '1.7% Automatic Random Discount - saved ₹1,234.50');
   for (const text of [formatOrderDiscount({ discount_percent: 1.4, discount_amount: 42 })]) {
     assert.ok(!/coupon|surprise/i.test(text));

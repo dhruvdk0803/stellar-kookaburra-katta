@@ -1,7 +1,7 @@
 // Razorpay order creation — Supabase Edge Function (Deno).
 //
 // Flow: authenticate the user, recompute the order total from authoritative DB
-// prices and the active discount tiers (never trust the client), create a
+// prices and the server-decided random discount (never trust the client), create a
 // pending order, and create the corresponding Razorpay order. Returns the
 // Razorpay key id + order id so the client can open checkout.js.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
@@ -9,6 +9,7 @@ import { cors, json, keyId, razorpayFetch } from "../_shared/razorpay.ts";
 import { parseCheckoutRequest } from "../_shared/checkout.ts";
 import {
   matchesExpectedTotal,
+  normalizeDiscountPercent,
   orderSummary,
   priceCart,
   type ProductRow,
@@ -44,29 +45,38 @@ Deno.serve(async (req) => {
     const razorpayKeyId = keyId();
 
     const admin = createClient(supabaseUrl, serviceKey);
-    const [productResult, tierResult] = await Promise.all([
+    const [productResult, discountResult] = await Promise.all([
       admin
         .from("products")
         .select("id, price, variants, is_active, stock")
         .in("id", request.productIds),
-      admin
-        .from("discount_tiers")
-        .select("min_subtotal, discount_percent, is_active")
-        .eq("is_active", true)
-        .order("min_subtotal", { ascending: true }),
+      // The random discount is decided in SQL from a server-held secret and
+      // the cart contents (same cart -> same percent). Only product_id and
+      // quantity are sent; nothing the browser claims about a discount is used.
+      admin.rpc("get_cart_discount_percent", {
+        p_items: request.items.map((item) => {
+          const { product_id, quantity } = item as { product_id: unknown; quantity: unknown };
+          return { product_id, quantity: Number(quantity) };
+        }),
+      }),
     ]);
     if (productResult.error) throw productResult.error;
-    if (tierResult.error) throw tierResult.error;
+    // Never silently charge a wrong total: if the discount cannot be decided, stop.
+    const discountPercent = normalizeDiscountPercent(discountResult.data);
+    if (discountResult.error || discountPercent === null) {
+      console.error("get_cart_discount_percent failed", discountResult.error?.message ?? discountResult.data);
+      return json({ error: "Could not calculate your discount. Please try again." }, 500);
+    }
 
     const priced = priceCart({
       items: request.items,
       products: (productResult.data || []) as unknown as ProductRow[],
-      tiers: tierResult.data || [],
+      discountPercent,
     });
     if (!priced.ok) return json({ error: priced.error }, priced.status);
 
     // The browser sends the total it displayed. A mismatch means prices or the
-    // discount tiers changed; return the server's figures so the UI refreshes.
+    // cart discount changed; return the server's figures so the UI refreshes.
     if (!matchesExpectedTotal(request.expectedTotalPaise, priced)) {
       return json(staleTotalBody(priced), 409);
     }
