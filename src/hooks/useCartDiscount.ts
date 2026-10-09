@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 import { MAX_DISCOUNT_PERCENT } from '@/lib/discounts';
 
 export const CART_DISCOUNT_QUERY_KEY = ['cart-discount'] as const;
@@ -43,8 +44,9 @@ const fetchCartDiscount = async (key: string): Promise<number> => {
 /**
  * The server-decided Automatic Random Discount for this cart.
  *
- * - Identical carts share a cached answer; any change (add/remove/quantity)
- *   asks the server again, debounced so rapid quantity clicks send one request.
+ * - The percent is this customer's own and rises with every piece in the
+ *   cart. Identical carts share a cached answer; any change (add/remove/quantity)
+ *   or login/logout asks the server again, debounced so rapid quantity clicks send one request.
  * - `isLoading` is true while the percent for the CURRENT cart is not yet known
  *   (debounce pending or request in flight); `percent` then holds the previous
  *   cart's value, so show it dimmed and never use it to charge. Checkout blocks
@@ -57,6 +59,8 @@ const fetchCartDiscount = async (key: string): Promise<number> => {
 export const useCartDiscount = (
   cart: ReadonlyArray<CartLine>,
 ): { percent: number; isLoading: boolean; isError: boolean } => {
+  // Each customer has their own curve (guests share one), so the signed-in user is part of the cache key.
+  const { user } = useAuth();
   const liveKey = cartDiscountKey(cart);
   const [debouncedKey, setDebouncedKey] = useState(liveKey);
 
@@ -71,7 +75,7 @@ export const useCartDiscount = (
   }, [liveKey, debouncedKey]);
 
   const { data, isFetching, isError, isPlaceholderData } = useQuery({
-    queryKey: [...CART_DISCOUNT_QUERY_KEY, debouncedKey],
+    queryKey: [...CART_DISCOUNT_QUERY_KEY, user?.id ?? 'guest', debouncedKey],
     queryFn: () => fetchCartDiscount(debouncedKey),
     enabled: debouncedKey !== '',
     staleTime: 10 * 60 * 1000,

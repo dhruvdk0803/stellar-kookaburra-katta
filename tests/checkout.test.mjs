@@ -187,7 +187,7 @@ test('getDiscountBanner: friendly message with the percent and the change-with-c
   const banner = getDiscountBanner(2.37, { isLoading: false, hasItems: true });
   assert.equal(banner.status, 'applied');
   assert.equal(banner.message, 'You got 2.37% automatic random discount on this order!');
-  assert.equal(banner.hint, 'Your discount can change when you change your cart');
+  assert.equal(banner.hint, 'Add more items to increase your discount');
   assert.equal(getDiscountBanner(5, { isLoading: false, hasItems: true }).message, 'You got 5% automatic random discount on this order!');
 });
 

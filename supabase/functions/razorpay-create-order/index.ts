@@ -50,10 +50,12 @@ Deno.serve(async (req) => {
         .from("products")
         .select("id, price, variants, is_active, stock")
         .in("id", request.productIds),
-      // The random discount is decided in SQL from a server-held secret and
-      // the cart contents (same cart -> same percent). Only product_id and
-      // quantity are sent; nothing the browser claims about a discount is used.
+      // The random discount is decided in SQL from a server-held secret, this
+      // customer and the number of pieces (more pieces -> higher percent). Only
+      // product_id and quantity are sent; nothing the browser claims about a
+      // discount is used.
       admin.rpc("get_cart_discount_percent", {
+        p_user_id: user.id,
         p_items: request.items.map((item) => {
           const { product_id, quantity } = item as { product_id: unknown; quantity: unknown };
           return { product_id, quantity: Number(quantity) };

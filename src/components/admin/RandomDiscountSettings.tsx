@@ -122,8 +122,8 @@ const RandomDiscountSettings = () => {
           Automatic Random Discount
         </CardTitle>
         <CardDescription>
-          Each cart gets a random discount between the minimum and maximum, decided by the server. It changes when the
-          cart changes. No minimum order.
+          Each customer gets their own random discount between the minimum and maximum, decided by the server. It
+          goes up with every item added to the cart and down when items are removed. No minimum order.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-5">

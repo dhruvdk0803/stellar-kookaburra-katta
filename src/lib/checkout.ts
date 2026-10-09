@@ -179,7 +179,7 @@ export type DiscountBanner =
   | { status: 'applied'; message: string; hint: string; percent: number };
 
 export const DISCOUNT_LOADING_MESSAGE = 'Calculating your automatic random discount…';
-export const DISCOUNT_CHANGE_HINT = 'Your discount can change when you change your cart';
+export const DISCOUNT_CHANGE_HINT = 'Add more items to increase your discount';
 
 /**
  * Copy for the Automatic Random Discount banner. `percent` is the server-decided
