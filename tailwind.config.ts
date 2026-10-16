@@ -19,6 +19,16 @@ export default {
     },
     extend: {
       colors: {
+        // Landing-page palette (tokens live on .home in globals.css).
+        home: {
+          bg: "var(--home-bg)",
+          surface: "var(--home-surface)",
+          ink: "var(--home-ink)",
+          muted: "var(--home-muted)",
+          tile: "var(--home-tile)",
+          line: "var(--home-line)",
+          accent: "var(--home-accent)",
+        },
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",

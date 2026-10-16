@@ -112,3 +112,24 @@
 .font-playfair {
   font-family: 'Playfair Display', serif;
 }
+
+/* Landing page: one sans family, one accent, warm stone neutrals. */
+.home {
+  --home-bg: #f7f6f3;
+  --home-surface: #ffffff;
+  --home-ink: #1b1d1a;
+  --home-muted: #5f625c;
+  --home-tile: #f0efea;
+  --home-line: #e3e1db;
+  --home-accent: #1f3a2e;
+  font-family: 'Hanken Grotesk', ui-sans-serif, system-ui, sans-serif;
+  font-feature-settings: 'ss01';
+  color: var(--home-ink);
+  background: var(--home-bg);
+  -webkit-font-smoothing: antialiased;
+}
+
+.home h1, .home h2, .home h3 {
+  font-family: inherit;
+  letter-spacing: -0.02em;
+}
