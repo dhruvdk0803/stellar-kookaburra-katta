@@ -1,5 +1,7 @@
 import { Link } from 'react-router-dom';
-import { container, section, textLink } from './styles';
+import { container, focusRing, section, textLink } from './styles';
+
+const quoteLink = `https://wa.me/918005708058?text=${encodeURIComponent('Hi Katta Interiors, I would like a quote for this material list:')}`;
 
 const values = [
   { title: 'Named brands', text: 'Branded products with clear specifications on every product page.' },
@@ -25,10 +27,10 @@ const HomeStory = () => (
       </div>
       <div className="lg:col-span-6">
         <h2 id="home-story" className="max-w-md text-balance text-2xl font-medium sm:text-[2rem] sm:leading-tight">
-          One store for the whole fit-out.
+          Buying for a whole project?
         </h2>
         <p className="mt-5 max-w-lg text-pretty leading-7 text-home-muted">
-          From the first laminate sample to the last fitting, Katta Interiors brings the materials and hardware for a project together in one place.
+          Send us your list of materials and we will reply with one quote for everything, from the first laminate sheet to the last fitting.
         </p>
         <dl className="mt-10 divide-y divide-home-line border-y border-home-line">
           {values.map((value) => (
@@ -38,9 +40,16 @@ const HomeStory = () => (
             </div>
           ))}
         </dl>
-        <div className="mt-8 flex flex-wrap gap-x-7 gap-y-3">
+        <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-4">
+          <a
+            href={quoteLink}
+            target="_blank"
+            rel="noreferrer"
+            className={`${focusRing} inline-flex h-12 items-center bg-home-accent px-6 text-base font-medium text-white hover:bg-home-ink`}
+          >
+            Send us your material list
+          </a>
           <Link to="/projects" className={textLink}>See our projects</Link>
-          <Link to="/about" className={textLink}>About Katta</Link>
         </div>
         <p className="mt-8 text-sm leading-6 text-home-muted">
           For available items in Jaipur we try to deliver in under 2 hours. Delivery times are not guaranteed.

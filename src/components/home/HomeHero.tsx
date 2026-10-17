@@ -1,7 +1,12 @@
 import { Link } from 'react-router-dom';
+import { MessageCircle, Timer, Truck } from 'lucide-react';
 import { container, focusRing, textLink } from './styles';
 
-const promises = ['Free shipping on every order', 'Fast delivery across Jaipur', 'Help on WhatsApp when you need it'];
+const promises = [
+  { icon: Truck, text: 'Free shipping on every order' },
+  { icon: Timer, text: 'Fast delivery across Jaipur' },
+  { icon: MessageCircle, text: 'Help on WhatsApp when you need it' },
+];
 
 const HomeHero = () => (
   <section aria-labelledby="home-title" className="pt-4 sm:pt-10">
@@ -43,7 +48,12 @@ const HomeHero = () => (
 
     <div className={`${container} mt-10 sm:mt-14`}>
       <ul className="grid gap-3 border-y border-home-line py-5 text-[15px] text-home-muted sm:grid-cols-3 sm:gap-6">
-        {promises.map((promise) => <li key={promise}>{promise}</li>)}
+        {promises.map(({ icon: Icon, text }) => (
+          <li key={text} className="flex items-center gap-3">
+            <Icon aria-hidden="true" className="h-[18px] w-[18px] shrink-0 text-home-accent" strokeWidth={1.5} />
+            {text}
+          </li>
+        ))}
       </ul>
     </div>
   </section>

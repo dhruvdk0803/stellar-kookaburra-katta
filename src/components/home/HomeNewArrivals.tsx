@@ -19,7 +19,7 @@ const HomeNewArrivals = () => {
   const title = products?.some((product) => isNewProduct(product.created_at)) ? 'New arrivals' : 'Latest additions';
 
   return (
-    <section aria-labelledby="home-new" className={`${section} border-t border-home-line`}>
+    <section aria-labelledby="home-new" className={section}>
       <div className={container}>
         <SectionHeader id="home-new" title={title} linkTo="/shop" linkLabel="View all" />
         <ul aria-busy={isPending} className="grid grid-cols-2 gap-x-4 gap-y-10 sm:gap-x-6 lg:grid-cols-4">

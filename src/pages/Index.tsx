@@ -15,8 +15,8 @@ const Index = () => {
       <main id="main" className="home">
         <HomeHero />
         <HomeCategories />
-        <HomeNewArrivals />
         <HomeBrands />
+        <HomeNewArrivals />
         <HomeStory />
       </main>
       <Footer />

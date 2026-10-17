@@ -176,13 +176,13 @@ const Navigation = () => {
   return (
     <nav className="sticky top-0 z-50 w-full bg-white border-b border-gray-200/50 shadow-sm transition-all duration-300">
       <div className="max-w-7xl mx-auto px-4">
-        <div className="flex justify-between items-center py-3">
+        <div className="flex justify-between items-center py-1.5">
           {/* Logo */}
           <Link to="/" aria-label="Katta Interiors home" className="group flex shrink-0 items-center transition-opacity duration-200 hover:opacity-80">
             <img
               src="/images/katta-interiors-logo.png"
               alt="Katta Interiors"
-              className="h-14 w-auto object-contain sm:h-16 xl:h-[72px]"
+              className="h-11 w-auto object-contain sm:h-12 xl:h-14"
               width="82"
               height="72"
             />
@@ -196,7 +196,7 @@ const Navigation = () => {
                 <Link
                   key={item.path}
                   to={item.path}
-                  className={`font-medium transition-all duration-200 px-2 py-2 rounded-md hover:bg-primary/5 ${
+                  className={`text-[15px] font-medium transition-all duration-200 px-2 py-1.5 rounded-md hover:bg-primary/5 ${
                     isActive(item.path) ? 'text-primary bg-primary/5' : 'text-gray-700 hover:text-primary'
                   }`}
                 >
@@ -205,7 +205,7 @@ const Navigation = () => {
               ))}
               {/* Shop Dropdown */}
               <DropdownMenu open={isShopMenuOpen} onOpenChange={setIsShopMenuOpen}>
-                <DropdownMenuTrigger className="flex items-center space-x-1 text-gray-700 hover:text-primary font-medium px-2 py-2 rounded-md hover:bg-primary/5 transition-all duration-200">
+                <DropdownMenuTrigger className="flex items-center space-x-1 text-[15px] text-gray-700 hover:text-primary font-medium px-2 py-1.5 rounded-md hover:bg-primary/5 transition-all duration-200">
                   <span>Shop</span>
                   <ChevronDown className="h-4 w-4 transition-transform duration-200" />
                 </DropdownMenuTrigger>
@@ -266,7 +266,7 @@ const Navigation = () => {
                       setShowDropdown(true);
                     }}
                     onFocus={() => setShowDropdown(true)}
-                    className="pl-10 w-64 2xl:w-80 h-10 border-gray-200 focus:border-primary focus:ring-1 focus:ring-primary/20 rounded-full transition-all duration-200 bg-white/80"
+                    className="pl-10 w-64 2xl:w-80 h-9 text-sm border-gray-200 focus:border-primary focus:ring-1 focus:ring-primary/20 rounded-full transition-all duration-200 bg-white/80"
                   />
                 </form>
                 
@@ -304,12 +304,12 @@ const Navigation = () => {
                 )}
               </div>
 
-              <Button variant="ghost" size="icon" asChild className="hover:bg-primary/5 rounded-full transition-all duration-200 h-10 w-10 p-0">
+              <Button variant="ghost" size="icon" asChild className="hover:bg-primary/5 rounded-full transition-all duration-200 h-9 w-9 p-0">
                 <Link to="/wishlist">
                   <Heart className="h-5 w-5 text-gray-700 hover:text-primary transition-colors duration-200" />
                 </Link>
               </Button>
-              <Button variant="ghost" size="icon" asChild className="relative hover:bg-primary/5 rounded-full transition-all duration-200 h-10 w-10 p-0">
+              <Button variant="ghost" size="icon" asChild className="relative hover:bg-primary/5 rounded-full transition-all duration-200 h-9 w-9 p-0">
                 <Link to="/cart" aria-label="View cart">
                   <ShoppingCart className="h-5 w-5 text-gray-700" />
                   {cartCount > 0 && (
@@ -319,7 +319,7 @@ const Navigation = () => {
                   )}
                 </Link>
               </Button>
-              <Button variant="ghost" size="icon" asChild className="hover:bg-primary/5 rounded-full transition-all duration-200 h-10 w-10 p-0">
+              <Button variant="ghost" size="icon" asChild className="hover:bg-primary/5 rounded-full transition-all duration-200 h-9 w-9 p-0">
                 <Link to="/account">
                   <User className="h-5 w-5 text-gray-700 hover:text-primary transition-colors duration-200" />
                 </Link>

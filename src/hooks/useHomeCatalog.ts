@@ -47,6 +47,7 @@ export const useNewArrivals = (limit = 8) =>
         .from('products')
         .select('id, name, price, image_url, images, variants, created_at, category_id, brands(name)')
         .eq('is_active', true)
+        .gt('stock', 0)
         .order('created_at', { ascending: false })
         .limit(60);
       if (error) throw error;
