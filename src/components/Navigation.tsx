@@ -10,6 +10,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { formatRupees } from '@/lib/money';
 import { handleImageError } from '@/lib/productImages';
 import { filterNonEmptyCategories, productBrowsingCategories } from '@/lib/categories';
+import { searchOrFilters } from '@/lib/search';
 
 const navItems = [
   { label: 'Home', path: '/' },
@@ -121,19 +122,21 @@ const Navigation = () => {
     // A slow response for an older query must not overwrite newer results.
     let cancelled = false;
     const searchProducts = async () => {
-      if (searchQuery.trim().length < 2) {
+      // Every word must match the name; Hindi words like "kabja" also match their
+      // English equivalents (src/lib/search.ts).
+      const filters = searchOrFilters(searchQuery);
+      if (searchQuery.trim().length < 2 || filters.length === 0) {
         setSearchResults([]);
         setIsSearching(false);
         return;
       }
 
       setIsSearching(true);
-      const { data, error } = await supabase
-        .from('products')
-        .select('id, name, image_url, images, price')
-        .ilike('name', `%${searchQuery.trim()}%`)
-        .eq('is_active', true)
-        .limit(5);
+      const query = filters.reduce(
+        (builder, filter) => builder.or(filter),
+        supabase.from('products').select('id, name, image_url, images, price'),
+      );
+      const { data, error } = await query.eq('is_active', true).limit(5);
 
       if (cancelled) return;
       if (!error && data) {

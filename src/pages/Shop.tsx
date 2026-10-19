@@ -17,6 +17,7 @@ import {
   productBrowsingCategories,
   productMatchesSelectedCategories,
 } from '@/lib/categories';
+import { matchesSearch } from '@/lib/search';
 
 // Fetch all active products with pagination. PostgREST caps any single
 // request at 1000 rows regardless of the requested limit, so the catalog
@@ -113,11 +114,21 @@ const Shop = () => {
     setVisibleCount(24);
   }, [filters, sortBy, searchTerm]);
   const searchMatchedProducts = React.useMemo(() => {
-    const normalizedSearch = normalizeFilterValue(searchTerm);
-    return normalizedSearch
-      ? allProducts.filter((product) => normalizeFilterValue(product.name).includes(normalizedSearch))
-      : allProducts;
-  }, [allProducts, searchTerm]);
+    if (!searchTerm.trim()) return allProducts;
+    // Name, brand and category (and its parent) all count, and Hindi words like
+    // "kabja" are understood (see src/lib/search.ts).
+    return allProducts.filter((product) =>
+      matchesSearch(
+        [
+          product.name,
+          product.brands?.name,
+          product.categories?.name,
+          categoriesById.get(product.categories?.parent_id)?.name,
+        ].filter(Boolean).join(' '),
+        searchTerm,
+      ),
+    );
+  }, [allProducts, searchTerm, categoriesById]);
 
   // Facets cross-filter each other: a selected brand narrows categories, and
   // selected categories narrow available brands. Exclude each facet's own
