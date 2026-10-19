@@ -4,6 +4,7 @@
 // also binds it to the caller's pending local order and checks Razorpay's
 // authoritative order/payment records before confirming fulfilment.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { notifyOwnerOfOrder } from "../_shared/notifyOwner.ts";
 import {
   cors,
   json,
@@ -123,6 +124,7 @@ Deno.serve(async (req) => {
       },
     );
     if (confirmError) throw confirmError;
+    notifyOwnerOfOrder(admin, order.id);
 
     return json({ verified: true, orderId, inventoryIssue: confirmation?.inventory_issue === true });
   } catch (e) {

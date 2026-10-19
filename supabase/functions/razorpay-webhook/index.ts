@@ -1,6 +1,7 @@
 // Razorpay webhook receiver — recovery path for successful payments when the
 // shopper closes the browser before the Checkout handler can call verify.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { notifyOwnerOfOrder } from "../_shared/notifyOwner.ts";
 import {
   cors,
   json,
@@ -89,6 +90,7 @@ Deno.serve(async (req) => {
       },
     );
     if (confirmError) throw confirmError;
+    notifyOwnerOfOrder(admin, order.id);
 
     return json({ received: true, confirmed: true, orderId, inventoryIssue: confirmation?.inventory_issue === true });
   } catch (e) {

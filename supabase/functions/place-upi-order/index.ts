@@ -8,6 +8,7 @@
 // and reserves (decrements) the stock. Cancelling the order later releases
 // that stock again (orders_release_reserved_stock trigger).
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { notifyOwnerOfOrder } from "../_shared/notifyOwner.ts";
 import { cors, json } from "../_shared/razorpay.ts";
 import { parseCheckoutRequest } from "../_shared/checkout.ts";
 import {
@@ -116,6 +117,8 @@ Deno.serve(async (req) => {
     if (typeof orderId !== "string" || orderId === "") {
       throw new Error("Order placement returned no order id");
     }
+
+    notifyOwnerOfOrder(admin, orderId);
 
     return json({ dbOrderId: orderId, ...summary });
   } catch (e) {
